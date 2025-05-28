@@ -1,63 +1,90 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Lombada Inteligente</title>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet" />
   <style>
-    body {
+    :root {
+      --verde: #007f3f;
+      --verde-claro: #00c378;
+      --marrom: #3e2f2f;
+      --cinza-escuro: #121212;
+    }
+
+    * {
       margin: 0;
-      font-family: 'Orbitron', sans-serif;
-      background-color: #0f0f0f;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Open Sans', sans-serif;
+      background-color: var(--cinza-escuro);
       color: #fff;
       line-height: 1.6;
     }
 
     header {
-      background: linear-gradient(90deg, #00ff88, #007f3f);
+      background: linear-gradient(135deg, #00c378, #007f3f);
       padding: 4rem 2rem;
       text-align: center;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
     }
 
     header h1 {
-      font-size: 2.5rem;
-      margin: 0;
-      color: #ffffff;
-      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+      font-size: 3rem;
+      font-family: 'Orbitron', sans-serif;
     }
 
     header p {
-      font-size: 1.2rem;
-      color: #e0f7fa;
-      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+      font-size: 1.3rem;
+      margin-top: 1rem;
     }
 
     section {
+      padding: 3rem 2rem;
       max-width: 1000px;
-      margin: 2rem auto;
-      padding: 2rem;
-      background-color: #3e2f2f;
-      border-radius: 12px;
-      box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
+      margin: auto;
     }
 
-    section img {
+    .card {
+      background: var(--marrom);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      transition: transform 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+    }
+
+    .card h2 {
+      color: var(--verde-claro);
+      margin-bottom: 1rem;
+    }
+
+    .card img {
       width: 100%;
-      border-radius: 8px;
+      border-radius: 10px;
       margin: 1rem 0;
     }
 
-    h2 {
-      color: #00c3ff;
+    .benefits ul {
+      list-style: square;
+      padding-left: 1.5rem;
     }
 
     form {
       display: flex;
       flex-direction: column;
       gap: 1rem;
-      margin-top: 1rem;
+      margin-top: 1.5rem;
     }
 
     input, textarea {
@@ -68,25 +95,32 @@
     }
 
     button {
-      background-color: #00c3ff;
+      background-color: var(--verde-claro);
       color: #000;
       padding: 0.8rem;
       border: none;
       border-radius: 8px;
       cursor: pointer;
       font-weight: bold;
+      transition: background 0.3s;
     }
 
     button:hover {
-      background-color: #00a0cc;
+      background-color: #00a866;
     }
 
     footer {
+      background-color: #111;
       text-align: center;
       padding: 1rem;
-      background-color: #111;
       font-size: 0.9rem;
       color: #aaa;
+    }
+
+    @media (max-width: 600px) {
+      header h1 {
+        font-size: 2rem;
+      }
     }
   </style>
 </head>
@@ -96,39 +130,35 @@
     <p>Energia limpa gerada com o movimento dos veículos</p>
   </header>
 
-  <section>
+  <section class="card">
     <h2>Sobre o Projeto</h2>
-    <p>
-      A Lombada Inteligente é uma solução inovadora voltada para sustentabilidade e tecnologia. O objetivo do projeto é utilizar o fluxo dos veículos em vias urbanas para gerar energia limpa e renovável, contribuindo para um futuro mais sustentável.
-    </p>
-    <img src="https://images.tcdn.com.br/img/img_prod/1340879/lombada_de_borracha_5cm_100x35x5cm_365_1_a7c713a22193cc9eae237e8deddd6123.jpg" alt="Conceito de energia sustentável">
+    <p>A Lombada Inteligente é uma solução sustentável que transforma o fluxo de veículos em energia limpa. Utiliza a força dos carros ao passarem sobre uma lombada adaptada, gerando eletricidade de forma ecológica e eficiente.</p>
+    <img src="https://i.imgur.com/JwzVLG5.jpg" alt="Energia sustentável" />
   </section>
 
-  <section>
+  <section class="card">
     <h2>Como Funciona</h2>
-    <p>
-      A lombada é equipada com um sistema mecânico e piezoelétrico que converte a força do impacto dos veículos em energia elétrica. Cada vez que um carro passa, o sistema coleta essa energia cinética e a transforma em eletricidade, que pode ser usada para alimentar iluminação pública, sensores urbanos ou armazenada em baterias.
-    </p>
-    <img src="https://i.imgur.com/4eL2Tde.jpg" alt="Funcionamento da lombada inteligente">
+    <p>Por meio de um sistema piezoelétrico e mecânico, o impacto dos veículos é convertido em energia elétrica, que pode ser usada em iluminação pública, sensores urbanos ou armazenada em baterias.</p>
+    <img src="https://i.imgur.com/4eL2Tde.jpg" alt="Funcionamento da lombada inteligente" />
   </section>
 
-  <section>
+  <section class="card benefits">
     <h2>Benefícios</h2>
     <ul>
-      <li>Geração de energia limpa e sustentável</li>
+      <li>Geração de energia limpa</li>
       <li>Redução da pegada de carbono</li>
-      <li>Integração com cidades inteligentes</li>
+      <li>Inovação para cidades inteligentes</li>
       <li>Baixo custo de manutenção</li>
     </ul>
-    <img src="https://i.imgur.com/rZrVyOV.jpg" alt="Cidade inteligente">
-  </section> 
+    <img src="https://i.imgur.com/rZrVyOV.jpg" alt="Cidade inteligente" />
+  </section>
 
-  <section>
+  <section class="card">
     <h2>Entre em Contato</h2>
-    <p>Quer participar do projeto ou saber mais? Envie uma mensagem para nós!</p>
+    <p>Quer participar do projeto ou saber mais? Fale com a gente!</p>
     <form action="#" method="post">
-      <input type="text" name="nome" placeholder="Seu nome" required>
-      <input type="email" name="email" placeholder="Seu e-mail" required>
+      <input type="text" name="nome" placeholder="Seu nome" required />
+      <input type="email" name="email" placeholder="Seu e-mail" required />
       <textarea name="mensagem" rows="4" placeholder="Sua mensagem" required></textarea>
       <button type="submit">Enviar</button>
     </form>
@@ -139,4 +169,3 @@
   </footer>
 </body>
 </html>
-
