@@ -4,14 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Lombada Inteligente</title>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --verde: #007f3f;
-      --verde-claro: #00c378;
-      --marrom: #3e2f2f;
-      --cinza-escuro: #121212;
+      --primaria: #00ffcc;
+      --secundaria: #0a0a0a;
+      --marrom-escuro: #2e1e1e;
+      --glow: 0 0 15px rgba(0, 255, 204, 0.7);
     }
 
     * {
@@ -21,23 +20,23 @@
     }
 
     body {
-      font-family: 'Open Sans', sans-serif;
-      background-color: var(--cinza-escuro);
-      color: #fff;
-      line-height: 1.6;
+      font-family: 'Orbitron', sans-serif;
+      background: radial-gradient(circle, #0a0a0a 40%, #000000 100%);
+      color: #ffffff;
     }
 
     header {
-      background: linear-gradient(135deg, #00c378, #007f3f);
+      background: linear-gradient(135deg, #00ffcc, #006b50);
+      color: black;
       padding: 4rem 2rem;
       text-align: center;
-      color: #fff;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      box-shadow: var(--glow);
+      border-bottom: 3px solid #00ffcc;
     }
 
     header h1 {
-      font-size: 3rem;
-      font-family: 'Orbitron', sans-serif;
+      font-size: 3.5rem;
+      text-shadow: var(--glow);
     }
 
     header p {
@@ -46,38 +45,48 @@
     }
 
     section {
-      padding: 3rem 2rem;
-      max-width: 1000px;
-      margin: auto;
+      max-width: 1100px;
+      margin: 2rem auto;
+      padding: 2rem;
     }
 
     .card {
-      background: var(--marrom);
-      border-radius: 12px;
+      background: var(--marrom-escuro);
+      border: 1px solid #00ffcc;
+      border-radius: 16px;
       padding: 2rem;
       margin-bottom: 2rem;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-      transition: transform 0.3s ease;
+      box-shadow: 0 0 20px rgba(0, 255, 204, 0.15);
+      transition: all 0.3s ease;
+      backdrop-filter: blur(4px);
     }
 
     .card:hover {
-      transform: translateY(-5px);
+      transform: scale(1.015);
+      box-shadow: 0 0 25px rgba(0, 255, 204, 0.3);
     }
 
     .card h2 {
-      color: var(--verde-claro);
+      color: var(--primaria);
+      font-size: 2rem;
       margin-bottom: 1rem;
     }
 
     .card img {
       width: 100%;
-      border-radius: 10px;
-      margin: 1rem 0;
+      border-radius: 12px;
+      margin-top: 1rem;
     }
 
     .benefits ul {
-      list-style: square;
       padding-left: 1.5rem;
+      list-style: none;
+    }
+
+    .benefits li::before {
+      content: '✓';
+      color: var(--primaria);
+      margin-right: 0.5rem;
     }
 
     form {
@@ -88,33 +97,43 @@
     }
 
     input, textarea {
-      padding: 0.8rem;
-      border: none;
-      border-radius: 8px;
+      padding: 1rem;
+      border: 1px solid #00ffcc;
+      background: #111;
+      color: #fff;
+      border-radius: 10px;
       font-size: 1rem;
+      transition: border 0.3s ease;
+    }
+
+    input:focus, textarea:focus {
+      border-color: #00ffa6;
+      outline: none;
     }
 
     button {
-      background-color: var(--verde-claro);
+      background-color: #00ffcc;
       color: #000;
+      font-weight: bold;
       padding: 0.8rem;
       border: none;
-      border-radius: 8px;
+      border-radius: 10px;
       cursor: pointer;
-      font-weight: bold;
-      transition: background 0.3s;
+      transition: background 0.3s ease;
     }
 
     button:hover {
-      background-color: #00a866;
+      background-color: #00c9a4;
     }
 
     footer {
       background-color: #111;
       text-align: center;
-      padding: 1rem;
-      font-size: 0.9rem;
+      padding: 1.5rem;
       color: #aaa;
+      font-size: 0.9rem;
+      margin-top: 3rem;
+      border-top: 1px solid #00ffcc33;
     }
 
     @media (max-width: 600px) {
@@ -127,35 +146,35 @@
 <body>
   <header>
     <h1>Lombada Inteligente</h1>
-    <p>Energia limpa gerada com o movimento dos veículos</p>
+    <p>Transformando movimento em energia limpa para o futuro</p>
   </header>
 
   <section class="card">
     <h2>Sobre o Projeto</h2>
-    <p>A Lombada Inteligente é uma solução sustentável que transforma o fluxo de veículos em energia limpa. Utiliza a força dos carros ao passarem sobre uma lombada adaptada, gerando eletricidade de forma ecológica e eficiente.</p>
-    <img src="https://i.imgur.com/JwzVLG5.jpg" alt="Energia sustentável" />
+    <p>A Lombada Inteligente é uma iniciativa ecológica que converte o impacto dos veículos em energia renovável. Com foco na sustentabilidade urbana, ela transforma tráfego em eletricidade limpa.</p>
+    <img src="https://i.imgur.com/JwzVLG5.jpg" alt="Energia sustentável">
   </section>
 
   <section class="card">
     <h2>Como Funciona</h2>
-    <p>Por meio de um sistema piezoelétrico e mecânico, o impacto dos veículos é convertido em energia elétrica, que pode ser usada em iluminação pública, sensores urbanos ou armazenada em baterias.</p>
-    <img src="https://i.imgur.com/4eL2Tde.jpg" alt="Funcionamento da lombada inteligente" />
+    <p>Utilizando sensores e tecnologia piezoelétrica, a lombada coleta energia cinética dos carros e a transforma em energia elétrica. Ideal para iluminar ruas, alimentar sensores e carregar baterias.</p>
+    <img src="https://i.imgur.com/4eL2Tde.jpg" alt="Funcionamento da lombada inteligente">
   </section>
 
   <section class="card benefits">
     <h2>Benefícios</h2>
     <ul>
-      <li>Geração de energia limpa</li>
-      <li>Redução da pegada de carbono</li>
-      <li>Inovação para cidades inteligentes</li>
-      <li>Baixo custo de manutenção</li>
+      <li>Energia limpa e gratuita</li>
+      <li>Redução do impacto ambiental</li>
+      <li>Compatível com cidades inteligentes</li>
+      <li>Baixa manutenção e alta eficiência</li>
     </ul>
-    <img src="https://i.imgur.com/rZrVyOV.jpg" alt="Cidade inteligente" />
+    <img src="https://i.imgur.com/rZrVyOV.jpg" alt="Cidade inteligente">
   </section>
 
   <section class="card">
     <h2>Entre em Contato</h2>
-    <p>Quer participar do projeto ou saber mais? Fale com a gente!</p>
+    <p>Gostaria de participar do projeto ou saber mais? Envie sua mensagem para a nossa equipe:</p>
     <form action="#" method="post">
       <input type="text" name="nome" placeholder="Seu nome" required />
       <input type="email" name="email" placeholder="Seu e-mail" required />
@@ -165,7 +184,7 @@
   </section>
 
   <footer>
-    &copy; 2025 Lombada Inteligente. Todos os direitos reservados.
+    &copy; 2025 Lombada Inteligente • Todos os direitos reservados
   </footer>
 </body>
 </html>
