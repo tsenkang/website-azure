@@ -270,6 +270,11 @@ function bindGameEvents(game) {
   }
   game.on('ventMove', ({ p }) => { if (p === me) audio.tone(160, 0.12, { type: 'square', vol: 0.06 }); });
   game.on('taskDone', ({ p }) => { if (p === me) renderer.addEffect({ type: 'sparkle', x: me.x, y: me.y, dur: 0.9 }); });
+  game.on('taskStep', ({ p, task }) => {
+    if (p !== me || !task) return;
+    const next = game.map.stationById[task.stationId];
+    toast(task.readyAt ? `Etapa concluída! Volte em ${Math.ceil(task.readyAt - game.time)}s para terminar.` : `Etapa ${task.step}/${task.stations.length} concluída! Próxima: ${next.name} (${game.roomName(next.room)}).`, 'ok', 4000);
+  });
   game.on('sabotage', ({ type }) => {
     const def = SABOTAGES[type];
     if (type === 'lights') audio.lightsOff(); else audio.sabotage();
@@ -389,10 +394,12 @@ canvas.addEventListener('pointerdown', (e) => {
 
 function startTaskMinigame(station) {
   const g = app.game, ctl = app.ctl;
+  const task = g.local.tasks.find((t) => t.stationId === station.id && !t.done);
   ctl.taskOpen(station);
   const m = openMinigame(station.task, {
     title: station.name,
     variant: station.variant,
+    phase: task && task.stations[task.step - 1] === station.id ? 1 : 0,
     subtitle: station.visual && g.settings.visualTasks ? 'Tarefa visual: quem estiver por perto vê você fazendo.' : undefined,
     onComplete: () => {
       app.minigame = null;
@@ -498,7 +505,7 @@ function frame(now) {
     if (g.mode === 'mirror') {
       // Tarefa falsa no online: o progresso é só visual no cliente.
       const b = g.local.busy;
-      if (b && b.kind === 'fake') { b.t += dt; if (b.t >= b.dur) { const t = g.local.tasks.find((x) => x.stationId === b.stationId); if (t) t.done = true; g.local.busy = null; } }
+      if (b && b.kind === 'fake') { b.t += dt; if (b.t >= b.dur) { g.local.busy = null; g.fakeStep(g.local, b.stationId); } }
       app.net?.tick(dt);
     }
     if (g.phase === 'meeting') {

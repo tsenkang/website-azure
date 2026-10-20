@@ -108,7 +108,7 @@ export class NetClient {
     }
     const me = game.local;
     me.role = init.you.role;
-    me.tasks = init.you.tasks.map((t) => ({ ...t }));
+    me.tasks = init.you.tasks.map((t) => ({ ...t, stations: [...t.stations] }));
     me.alive = init.you.alive;
     for (const id of init.you.teammates) game.playerById(id).role = 'impostor';
     game.phase = init.phase === 'ended' ? 'play' : init.phase;
@@ -154,9 +154,15 @@ export class NetClient {
         break;
       }
       case 'taskDone': {
-        const t = g.local.tasks.find((x) => x.stationId === d.station);
+        const t = g.local.tasks.find((x) => x.stationId === d.station && !x.done);
         if (t) t.done = true;
         g.emit('taskDone', { p: g.local, station: g.map.stationById[d.station] });
+        break;
+      }
+      case 'taskStep': {
+        const t = g.local.tasks.find((x) => x.stations[0] === d.first);
+        if (t) { t.step = d.step; t.stationId = t.stations[d.step]; t.readyAt = d.readyAt; }
+        g.emit('taskStep', { p: g.local, station: g.map.stationById[d.station], task: t });
         break;
       }
       case 'sabotage': g.sabotage.active = g.sabotage.active || { type: d.type, remaining: 99, fixed: {} }; g.emit('sabotage', { type: d.type }); break;

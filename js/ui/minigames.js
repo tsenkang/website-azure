@@ -3,45 +3,58 @@ import { audio } from '../audio.js';
 import * as technical from './games/technical.js';
 import * as knowledge from './games/knowledge.js';
 import * as simple from './games/simple.js';
+import * as ship from './games/ship.js';
 import { icon } from './icons.js';
 
 const GAMES = {
   wires: technical.wires,
   circuit: technical.circuit,
-  tools: technical.tools,
   robot: technical.robot,
   gauge: technical.gauge,
-  quiz: knowledge.quiz,
-  diag: knowledge.diag,
-  logic: knowledge.logic,
-  sequence: knowledge.sequence,
   keypad: knowledge.keypad,
-  sort: simple.sort,
-  wait: simple.wait,
   switches: simple.switches,
   hold: simple.hold,
   scan: simple.scan,
+  card: ship.card,
+  upload: ship.upload,
+  trash: ship.trash,
+  debris: ship.debris,
+  shields: ship.shields,
+  fuel: ship.fuel,
+  divert: ship.divert,
+  accept: ship.accept,
+  simon: ship.simon,
+  manifold: ship.manifold,
+  sample: ship.sample,
+  filter: ship.filter,
+  steering: ship.steering,
 };
 
 export const HELP = {
   wires: 'Arraste cada cabo da esquerda até o terminal da mesma cor.',
   circuit: 'Clique nas peças para girá-las e ligar a bateria ao LED.',
-  tools: 'Clique em uma ferramenta e depois no contorno correspondente do painel.',
   robot: 'Ajuste os dois eixos até o braço coincidir com a posição alvo.',
   gauge: 'Aperte PARAR (ou Espaço) quando o ponteiro estiver na faixa verde. Três acertos.',
-  quiz: 'Responda corretamente a 3 perguntas.',
-  diag: 'Leia os sintomas e escolha a peça com defeito. Três diagnósticos.',
-  logic: 'Ligue/desligue as chaves até a saída S acender. Três circuitos.',
-  sequence: 'Clique nos itens na ordem pedida.',
   keypad: 'Digite o código mostrado e confirme.',
-  sort: 'Clique na caixa correta para cada item que aparece.',
-  wait: 'Inicie o processo e aguarde terminar sem fechar a janela.',
   switches: 'Ligue todos os disjuntores do quadro.',
   hold: 'Mantenha o botão pressionado até estabilizar.',
   scan: 'Tarefa visual: quem estiver por perto vê o escaneamento acontecer.',
+  card: 'Passe o crachá pelo leitor na velocidade certa.',
+  upload: 'Transfira os dados sem fechar a janela.',
+  trash: 'Segure a alavanca até o lixo cair todo.',
+  debris: 'Mire e clique na sucata antes que ela entre na máquina.',
+  shields: 'Clique nos escudos vermelhos até todos ficarem brancos.',
+  fuel: 'Segure o botão até encher.',
+  divert: 'Suba a chave indicada até o topo.',
+  accept: 'Aceite a energia que foi desviada para cá.',
+  simon: 'Repita a sequência de luzes. Cinco etapas.',
+  manifold: 'Clique nos números em ordem, de 1 a 10.',
+  sample: 'Inicie a análise e volte depois para escolher a amostra alterada.',
+  filter: 'Arraste toda a sujeira até a sucção.',
+  steering: 'Leve a mira até o centro.',
 };
 
-export function openMinigame(type, { title, subtitle, variant, onComplete, onClose }) {
+export function openMinigame(type, { title, subtitle, variant, phase = 0, onComplete, onClose }) {
   const overlay = document.createElement('div');
   overlay.className = 'mg-overlay';
   overlay.innerHTML = `
@@ -69,6 +82,7 @@ export function openMinigame(type, { title, subtitle, variant, onComplete, onClo
 
   const api = {
     variant,
+    phase,
     audio,
     setStatus(text, kind = '') { status.textContent = text; status.className = `mg-status ${kind}`; },
     complete() {
@@ -83,6 +97,6 @@ export function openMinigame(type, { title, subtitle, variant, onComplete, onClo
   };
   overlay.querySelector('.x-btn').addEventListener('click', () => { audio.click(); close(false); });
   overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay) close(false); });
-  cleanup = (GAMES[type] || simple.wait)(body, api) || null;
+  cleanup = (GAMES[type] || ship.accept)(body, api) || null;
   return { close: () => close(false), get done() { return done; } };
 }

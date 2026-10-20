@@ -144,11 +144,24 @@ export class Game {
     this.addLog(`Impostores: ${this.impostors.map((p) => p.name).join(', ')}`, 'roles', true);
   }
 
+  // Uma tarefa pode ter várias etapas (ex.: baixar dados → enviar no servidor) ou duas fases
+  // na mesma estação com espera entre elas (ex.: analisar amostra).
+  makeTask(startId) {
+    const stations = [startId];
+    const first = this.map.stationById[startId];
+    if (first.delay) stations.push(startId);
+    let cur = first;
+    while (cur.next && stations.length < 4) { stations.push(cur.next); cur = this.map.stationById[cur.next]; }
+    return { stationId: startId, stations, step: 0, done: false, readyAt: 0 };
+  }
+
+  taskReady(task) { return !task.readyAt || this.time >= task.readyAt; }
+
   assignTasks() {
-    const st = this.map.stations;
+    const st = this.map.stations.filter((s) => !s.chainOnly);
     if (this.tutorial) {
       const ids = this.map.tutorial?.tasks || st.slice(0, 2).map((s) => s.id);
-      for (const p of this.players) p.tasks = ids.map((id) => ({ stationId: id, done: false }));
+      for (const p of this.players) p.tasks = ids.map((id) => this.makeTask(id));
       return;
     }
     const count = Math.max(2, Math.min(8, this.settings.tasksPerPlayer));
@@ -167,7 +180,7 @@ export class Game {
         }
         round++;
       }
-      p.tasks = chosen.map((s) => ({ stationId: s.id, done: false }));
+      p.tasks = chosen.map((s) => this.makeTask(s.id));
     }
   }
 
@@ -278,11 +291,20 @@ export class Game {
     if (b.t < b.dur) return;
     p.busy = null;
     if (b.kind === 'task') this.completeTask(p, b.stationId);
-    else if (b.kind === 'fake') {
-      const task = p.tasks.find((t) => t.stationId === b.stationId);
-      if (task) task.done = true;
-      this.emit('fakeDone', { p, stationId: b.stationId });
-    } else if (b.kind === 'fix') this.sabotage.fix(b.fixId, p);
+    else if (b.kind === 'fake') this.fakeStep(p, b.stationId);
+    else if (b.kind === 'fix') this.sabotage.fix(b.fixId, p);
+  }
+
+  // Impostor "fazendo" tarefa: avança as etapas igual a um aluno, mas não conta para a turma.
+  fakeStep(p, stationId) {
+    const task = p.tasks.find((t) => t.stationId === stationId && !t.done);
+    if (!task) return;
+    if (task.step < task.stations.length - 1) {
+      task.step++;
+      task.stationId = task.stations[task.step];
+      task.readyAt = task.stationId === stationId ? this.time + (this.map.stationById[stationId].delay || 30) : 0;
+    } else task.done = true;
+    this.emit('fakeDone', { p, stationId });
   }
 
   startBusy(p, kind, dur, extra = {}) {
@@ -292,10 +314,18 @@ export class Game {
 
   // ---------- ações ----------
   completeTask(p, stationId) {
-    const task = p.tasks.find((t) => t.stationId === stationId);
-    if (!task || task.done) return false;
+    const task = p.tasks.find((t) => t.stationId === stationId && !t.done);
+    if (!task || !this.taskReady(task)) return false;
     const station = this.map.stationById[stationId];
     if (this.sabotage.isStationBlocked(station)) return false;
+    if (task.step < task.stations.length - 1) {
+      // Avança para a próxima etapa (pode ser outra sala ou a mesma estação depois de uma espera).
+      task.step++;
+      task.stationId = task.stations[task.step];
+      task.readyAt = task.stationId === stationId ? this.time + (station.delay || 30) : 0;
+      this.emit('taskStep', { p, station, task });
+      return true;
+    }
     task.done = true;
     if (!p.isImpostor) {
       p.stats.tasksDone++;
@@ -489,6 +519,7 @@ export class Game {
         const s = this.map.stationById[t.stationId];
         if (!near(s)) continue;
         if (this.sabotage.isStationBlocked(s)) { res.use = { kind: 'blocked', station: s, label: 'Máquinas paradas: reinicie o CLP' }; break; }
+        if (!this.taskReady(t)) { res.use = { kind: 'waiting', station: s, label: `Análise em andamento: volte em ${Math.ceil(t.readyAt - this.time)}s`, disabled: true }; break; }
         res.use = p.isImpostor ? { kind: 'fake', station: s, label: `Fingir tarefa: ${s.name}` } : { kind: 'task', station: s, label: s.name };
         break;
       }

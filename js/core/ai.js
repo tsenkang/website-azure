@@ -4,7 +4,7 @@ import { findPath } from './pathfinding.js';
 import { lineOfSight } from './physics.js';
 import { SABOTAGES } from './sabotage.js';
 
-const TASK_DUR = { tools: 11, gauge: 7, wires: 7, circuit: 11, robot: 11, sort: 8, quiz: 9, wait: 12, sequence: 8, diag: 11, logic: 8, keypad: 6, scan: 10 };
+const TASK_DUR = { gauge: 7, wires: 7, circuit: 11, robot: 10, scan: 10, card: 4, upload: 8, trash: 6, debris: 11, shields: 5, fuel: 6, divert: 4, accept: 2, simon: 11, manifold: 7, sample: 4, filter: 7, steering: 5 };
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -262,7 +262,7 @@ export class BotBrain {
 
   doTasksOrWander() {
     const { g, p } = this;
-    const open = p.tasks.filter((t) => !t.done).map((t) => g.map.stationById[t.stationId])
+    const open = p.tasks.filter((t) => !t.done && g.taskReady(t)).map((t) => g.map.stationById[t.stationId])
       .filter((s) => !g.sabotage.isStationBlocked(s));
     if (this.detour) {
       if (this.goal?.kind === 'wander' && this.atGoal(10)) { this.detour = false; this.clearGoal(); this.idleUntil = g.time + rand(1, 4); return; }

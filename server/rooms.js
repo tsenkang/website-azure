@@ -226,6 +226,7 @@ class Room {
     }
     g.on('ventMove', ({ p, from, to }) => this.broadcastEvent('ventMove', (v) => (v === p ? { p: p.id, from: from.id, to: to.id } : null)));
     g.on('taskDone', ({ p, station }) => this.broadcastEvent('taskDone', (v) => (v === p ? { p: p.id, station: station.id } : null)));
+    g.on('taskStep', ({ p, station, task }) => this.broadcastEvent('taskStep', (v) => (v === p ? { station: station.id, first: task.stations[0], step: task.step, readyAt: task.readyAt } : null)));
     g.on('sabotage', ({ type }) => this.broadcastEvent('sabotage', { type }));
     g.on('sabotageEnd', ({ type, who }) => this.broadcastEvent('sabotageEnd', { type, who: who ? who.id : null }));
     g.on('fixPart', ({ fixId, who }) => this.broadcastEvent('fixPart', { fixId, who: who ? who.id : null }));
@@ -287,7 +288,7 @@ class Room {
         break;
       }
       case 'taskOpen': {
-        const task = p.tasks.find((t) => t.stationId === msg.stationId && !t.done);
+        const task = p.tasks.find((t) => t.stationId === msg.stationId && !t.done && g.taskReady(t));
         const s = g.map.stationById[msg.stationId];
         if (!task || !s || !near(s) || p.inVent || g.phase !== 'play' || g.sabotage.isStationBlocked(s)) break;
         if (p.isImpostor) g.startBusy(p, 'fake', 2.5 + Math.random() * 2, { stationId: s.id });

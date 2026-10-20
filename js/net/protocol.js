@@ -33,7 +33,7 @@ export function buildSnapshot(game, viewer) {
     snap.me = {
       kc: r1(viewer.killCooldown), eu: viewer.emergencyUses, vc: r1(viewer.ventCooldown), iv: viewer.inVent || 0,
       al: viewer.alive ? 1 : 0, x: r1(viewer.x), y: r1(viewer.y),
-      tk: viewer.tasks.map((t) => [t.stationId, t.done ? 1 : 0]), bz: viewer.busy ? viewer.busy.kind : 0,
+      tk: viewer.tasks.map((t) => [t.stations[0], t.done ? 1 : 0, t.step, r1(t.readyAt || 0)]), bz: viewer.busy ? viewer.busy.kind : 0,
     };
     if (viewer.isImpostor) { snap.sc = r1(sab.cooldown); snap.dc = r1(sab.doorCooldown); }
   }
@@ -57,7 +57,7 @@ export function buildInit(game, viewer) {
     you: {
       id: viewer.id,
       role: viewer.role,
-      tasks: viewer.tasks.map((t) => ({ stationId: t.stationId, done: t.done })),
+      tasks: viewer.tasks.map((t) => ({ stationId: t.stationId, stations: t.stations, step: t.step, done: t.done, readyAt: t.readyAt || 0 })),
       teammates: viewer.isImpostor ? game.players.filter((p) => p.isImpostor && p !== viewer).map((p) => p.id) : [],
       alive: viewer.alive,
     },
@@ -102,7 +102,7 @@ export function revealPayload(game) {
     result: { winner: game.result.winner, reason: game.result.reason, duration: game.result.duration, meetings: game.result.meetings, progress: game.result.progress },
     players: game.players.map((p) => ({
       id: p.id, role: p.role, alive: p.alive, ejected: p.ejected, stats: p.stats,
-      tasks: p.tasks.map((t) => ({ stationId: t.stationId, done: t.done })),
+      tasks: p.tasks.map((t) => ({ stationId: t.stationId, stations: t.stations, step: t.step, done: t.done, readyAt: t.readyAt || 0 })),
     })),
     log: game.log,
   };
@@ -151,9 +151,10 @@ export function applySnapshot(game, snap) {
     me.inVent = s.iv || null;
     // A posição do jogador local é prevista no cliente; o servidor só corrige diferenças grandes.
     if (me.inVent || wasInVent !== me.inVent || Math.hypot(s.x - me.x, s.y - me.y) > 2.5 * T) { me.x = s.x; me.y = s.y; }
-    for (const [stationId, done] of s.tk) {
-      const t = me.tasks.find((x) => x.stationId === stationId);
-      if (t) t.done = !!done;
+    for (const [firstId, done, step, readyAt] of s.tk) {
+      const t = me.tasks.find((x) => x.stations[0] === firstId);
+      if (!t) continue;
+      t.done = !!done; t.step = step; t.stationId = t.stations[step]; t.readyAt = readyAt;
     }
     if (!s.bz && me.busy && me.busy.kind !== 'minigame') me.busy = null;
   }

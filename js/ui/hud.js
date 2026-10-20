@@ -89,7 +89,8 @@ export class Hud {
     $('.taskbar-track i', this.root).style.width = `${total ? (done / total) * 100 : 0}%`;
     $('.taskbar', this.root).style.display = g.tutorial ? 'none' : '';
 
-    const sig = me.tasks.map((t) => `${t.stationId}:${t.done}`).join('|') + (g.sabotage.machinesDown ? 'M' : '');
+    const waiting = me.tasks.some((t) => !t.done && t.readyAt > g.time);
+    const sig = me.tasks.map((t) => `${t.stationId}:${t.done}:${t.step}`).join('|') + (g.sabotage.machinesDown ? 'M' : '') + (waiting ? Math.ceil(g.time) : '');
     if (sig !== this.taskSig) {
       this.taskSig = sig;
       const ul = $('.tasklist ul', this.root);
@@ -104,8 +105,10 @@ export class Hud {
         const s = g.map.stationById[t.stationId];
         const li = document.createElement('li');
         const blocked = g.sabotage.isStationBlocked(s);
-        li.className = t.done ? 'done' : blocked ? 'blocked' : '';
-        li.innerHTML = `<b>${g.roomName(s.room)}:</b> ${s.name}${s.visual && g.settings.visualTasks ? ' <em>(visual)</em>' : s.long ? ' <em>(longa)</em>' : ''}`;
+        const multi = t.stations.length > 1 && !t.done;
+        const wait = !t.done && t.readyAt > g.time ? ` <em>(volte em ${Math.ceil(t.readyAt - g.time)}s)</em>` : '';
+        li.className = t.done ? 'done' : blocked ? 'blocked' : wait ? 'waiting' : '';
+        li.innerHTML = `<b>${g.roomName(s.room)}:</b> ${s.name}${multi ? ` <em>(${t.step + 1}/${t.stations.length})</em>` : ''}${wait}${s.visual && g.settings.visualTasks ? ' <em>(visual)</em>' : ''}`;
         ul.appendChild(li);
       }
     }

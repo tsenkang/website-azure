@@ -1,4 +1,4 @@
-// Minijogos técnicos: cabos, circuito, ferramentas, braço robótico e medidor.
+// Minijogos técnicos: cabos, circuito, braço robótico e medidor.
 const shuffle = (a) => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 
@@ -165,45 +165,6 @@ export function circuit(root, api) {
     if (draw()) { api.setStatus('Circuito fechado! O LED acendeu.', 'ok'); api.complete(); }
   });
   api.setStatus('Gire as peças para fechar o circuito.');
-}
-
-// ---------- Organizar ferramentas ----------
-export function tools(root, api) {
-  const items = shuffle([['🔧', 'Chave inglesa'], ['🔨', 'Martelo'], ['🪛', 'Chave de fenda'], ['📏', 'Régua de aço'], ['🪚', 'Serrote'], ['✂️', 'Tesoura de chapa']]).slice(0, 5);
-  root.innerHTML = '';
-  const board = el('div', 'pegboard');
-  const bench = el('div', 'bench');
-  for (const [ico, name] of shuffle(items)) {
-    const s = el('button', 'peg-slot', `<span>${ico}</span><small>${name}</small>`);
-    s.dataset.name = name; board.appendChild(s);
-  }
-  items.forEach(([ico, name]) => {
-    const t = el('button', 'tool', ico);
-    t.title = name; t.dataset.name = name;
-    t.style.transform = `rotate(${Math.round(Math.random() * 60 - 30)}deg)`;
-    bench.appendChild(t);
-  });
-  root.append(board, el('div', 'bench-label', 'Bancada'), bench);
-  let selected = null, placed = 0;
-  bench.addEventListener('click', (e) => {
-    const t = e.target.closest('.tool');
-    if (!t || t.classList.contains('used')) return;
-    bench.querySelectorAll('.tool').forEach((x) => x.classList.remove('sel'));
-    selected = t; t.classList.add('sel'); api.audio.click();
-    api.setStatus(`Selecionado: ${t.title}. Agora clique no contorno certo.`);
-  });
-  board.addEventListener('click', (e) => {
-    const s = e.target.closest('.peg-slot');
-    if (!s || !selected || s.classList.contains('filled')) return;
-    if (s.dataset.name === selected.dataset.name) {
-      s.classList.add('filled'); selected.classList.add('used'); selected.classList.remove('sel');
-      selected = null; placed++;
-      api.audio.progress();
-      api.setStatus(`${placed}/${items.length} ferramentas no lugar`);
-      if (placed === items.length) api.complete();
-    } else api.fail('Esse contorno é de outra ferramenta!');
-  });
-  api.setStatus(`0/${items.length} ferramentas no lugar`);
 }
 
 // ---------- Calibrar braço robótico ----------

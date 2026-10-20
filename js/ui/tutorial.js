@@ -22,9 +22,9 @@ export class Tutorial {
     this.steps = [
       { text: 'Bem-vindo(a) ao treinamento! Use <kbd>W A S D</kbd> ou as <kbd>setas</kbd> para andar pela recepção.', done: () => this.moved > 160 },
       { text: 'Siga a seta amarela até a <b>Sala de Aula 12</b>. O nome da sala aparece no topo quando você entra.', target: () => this.game.map.roomById.aula, done: () => this.game.roomAtPos(this.game.local.x, this.game.local.y)?.id === 'aula' },
-      { text: 'Tarefas aparecem com um <b>!</b> amarelo. Chegue perto da mesa do professor e aperte <kbd>E</kbd> para fazer a <b>prova surpresa</b>.', target: () => this.game.map.stationById.aula_prova, done: () => this.game.local.tasks.find((t) => t.stationId === 'aula_prova').done },
+      { text: 'Tarefas aparecem com um <b>!</b> amarelo. Chegue perto do projetor e aperte <kbd>E</kbd> para <b>centralizar a mira</b>.', target: () => this.game.map.stationById.aula_projetor, done: () => this.game.local.tasks.find((t) => t.stations[0] === 'aula_projetor').done },
       { text: 'Mandou bem! Abra o mapa com <kbd>M</kbd> (ou clique no minimapa) para ver onde estão suas tarefas. Depois feche com <kbd>M</kbd>.', done: () => { if (this.isMapOpen()) this.mapWasOpen = true; return this.mapWasOpen && !this.isMapOpen(); } },
-      { text: 'Vá ao <b>Pátio</b> e monte o lanche da cantina (tarefa com <b>!</b>). A barra de tarefas da turma enche quando todos colaboram.', target: () => this.game.map.stationById.cantina_lanche, done: () => this.game.local.tasks.find((t) => t.stationId === 'cantina_lanche').done },
+      { text: 'Vá ao <b>Pátio</b> e destrave as válvulas de gás da cantina (tarefa com <b>!</b>). A barra de tarefas da turma enche quando todos colaboram.', target: () => this.game.map.stationById.cantina_lanche, done: () => this.game.local.tasks.find((t) => t.stations[0] === 'cantina_lanche').done },
       { text: 'Tem um <b>boneco de primeiros socorros</b> caído no Pátio. Chegue perto e aperte <kbd>R</kbd> para reportar a ocorrência.', target: () => this.dummy, done: () => false },
     ];
     this.render();

@@ -66,7 +66,7 @@ await page.keyboard.press('Escape');
 await start({ map: 'unidade', rolePref: 'aluno', players: 6, visualTasks: true });
 await G(() => {
   const g = window.__senai.app.game; const me = g.local; const s = g.map.stationById.enfermaria_exame;
-  me.tasks = [{ stationId: s.id, done: false }]; me.x = s.stand.px; me.y = s.stand.py;
+  me.tasks = [g.makeTask(s.id)]; me.x = s.stand.px; me.y = s.stand.py;
   const bot = g.players.find((p) => p.isBot && !p.isImpostor); bot.x = s.px + 70; bot.y = s.py + 20; bot.brain.decideCrew = () => {}; bot.brain.decideImpostor = () => {};
   window.__witness = bot.id;
 });
@@ -91,6 +91,22 @@ await wait(3500);
 const answered = await G((n) => window.__senai.app.game.meeting.state.chat.some((c) => c.name === n && /estava|Tava/.test(c.text)), botName);
 ok(`bot responde pergunta feita no chat livre (${botName})`, answered);
 await page.screenshot({ path: `${OUT}/feat-chat.png` });
+
+// ---------- Tarefa em 2 etapas: baixar dados e enviar no servidor ----------
+await start({ map: 'unidade', rolePref: 'aluno', players: 6 });
+await G(() => { const g = window.__senai.app.game; g.local.tasks = [g.makeTask('aula_prova')]; const s = g.map.stationById.aula_prova; g.local.x = s.stand.px; g.local.y = s.stand.py; });
+await wait(150);
+await page.keyboard.press('e');
+await page.click('.transfer button');
+await page.waitForSelector('.mg-overlay', { state: 'detached', timeout: 12000 });
+const afterStep = await G(() => { const t = window.__senai.app.game.local.tasks[0]; return [t.step, t.stationId, t.done]; });
+ok(`baixar dados leva à etapa de envio no servidor (${afterStep[1]})`, afterStep[0] === 1 && afterStep[1] === 'info_upload' && !afterStep[2]);
+await G(() => { const g = window.__senai.app.game; const s = g.map.stationById.info_upload; g.local.x = s.stand.px; g.local.y = s.stand.py; });
+await wait(150);
+await page.keyboard.press('e');
+await page.click('.transfer button');
+await page.waitForSelector('.mg-overlay', { state: 'detached', timeout: 12000 });
+ok('enviar dados conclui a tarefa inteira', await G(() => window.__senai.app.game.local.tasks[0].done));
 
 // ---------- Mapas novos ----------
 for (const map of ['galpao', 'fabrica']) {

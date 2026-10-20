@@ -76,12 +76,20 @@ No celular, arraste no lado esquerdo da tela para andar e use os botões à dire
 - **Câmeras de segurança:** imagens ao vivo de quatro pontos do mapa.
 - **Chat livre:** os bots entendem acusações ("foi o Bruno", "vi a Camila no duto"), defesas ("confio na Sofia"), "não fui eu" e perguntas ("Diego, onde você estava?"), que eles respondem.
 
-**13 tipos de minijogo funcionais**, com variações por mapa:
-- cabos, circuito, painel de ferramentas, braço robótico, medidor
-- provas (técnica, NR‑10, logística, qualidade, catálogo)
-- diagnóstico de PC e de motor, portas lógicas
-- sequências (lanche, diários, livros, embalagem, mistura de tinta)
-- teclado, separação de itens, processos com espera, escâner médico
+**17 tipos de missão, no estilo do gênero**, com variações por mapa:
+- **De 2 etapas:** baixar dados → enviar no servidor; pegar combustível → abastecer o gerador; desviar energia → aceitar a energia em outra sala.
+- **Com espera:** analisar amostra (inicia, volta em 30 s e escolhe o tubo alterado).
+- **Ação:**
+  - passar o crachá no leitor na velocidade certa
+  - esvaziar o lixo puxando a alavanca
+  - destruir sucata na esteira (tiro ao alvo)
+  - ativar os escudos (hexágonos)
+  - ligar o reator (repetir sequência de luzes)
+  - destravar válvulas de 1 a 10
+  - limpar o filtro arrastando a sujeira
+  - centralizar a mira
+- **Técnicas:** consertar fiação, reparar a placa de controle, alinhar o braço robótico, calibrar o distribuidor.
+- **Visual:** exame no escâner médico.
 
 **5 sabotagens:** apagão, GPS offline, pane nas máquinas, portas trancadas e sobrecarga crítica, que tem dois consoles distantes.
 
@@ -134,8 +142,8 @@ npm test               # valida os 3 mapas e roda 12 partidas só com bots (Node
 npm start              # em outro terminal, para os testes abaixo
 npm run test:online    # 2 clientes WebSocket: sala, partida, reunião, chat, votos, trapaças e reconexão
 node tests/online-browser.mjs   # 2 janelas de navegador jogando online pela interface
-npm run test:browser   # fluxo completo local + resolve os 13 minijogos pela interface
-node tests/features.mjs         # duto, admin, tarefa visual, chat com resposta de bot e mapas
+npm run test:browser   # fluxo completo local + resolve todas as missões pela interface
+node tests/features.mjs         # duto, admin, tarefa visual, tarefa em 2 etapas, chat e mapas
 ```
 
 ## Pendências

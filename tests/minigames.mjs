@@ -25,7 +25,10 @@ await page.evaluate(() => {
   const g = window.__senai.app.game;
   const byType = {};
   for (const st of g.map.stations) byType[st.task] ||= st.id;
-  g.local.tasks = Object.values(byType).map((id) => ({ stationId: id, done: false }));
+  // Uma tarefa de etapa única por tipo; a amostra também é testada na segunda fase.
+  g.local.tasks = Object.values(byType).map((id) => ({ stationId: id, stations: [id], step: 0, done: false, readyAt: 0 }));
+  const sampleId = byType.sample;
+  g.local.tasks.push({ stationId: sampleId, stations: [sampleId, sampleId], step: 1, done: false, readyAt: 0, phase2: true });
   // Congela os bots para o teste ser determinístico.
   for (const p of g.players) if (p.isBot) { p.brain.update = () => {}; }
   g.sabotage.cooldown = 999; g.events.next = 9999;
@@ -38,7 +41,69 @@ async function openStation(id) {
   await page.waitForSelector('.mg-overlay .mg-body');
 }
 
+async function canvasClick(sel, x, y) {
+  const box = await (await page.$(sel)).boundingBox();
+  const size = await page.$eval(sel, (c) => [c.width, c.height]);
+  return { x: box.x + (x / size[0]) * box.width, y: box.y + (y / size[1]) * box.height };
+}
+
 const solvers = {
+  async card() {
+    for (let attempt = 0; attempt < 3 && await page.$('.badge'); attempt++) {
+      const b = await (await page.$('.badge')).boundingBox();
+      const slot = await (await page.$('.slot')).boundingBox();
+      await page.mouse.move(b.x + 20, b.y + 50);
+      await page.mouse.down();
+      for (let i = 1; i <= 16; i++) { await page.mouse.move(b.x + 20 + ((slot.width - 140) * i) / 16, b.y + 50); await wait(45); }
+      await page.mouse.up();
+      await wait(400);
+    }
+  },
+  async upload() { await page.click('.transfer button'); await wait(7600); },
+  async trash() { const k = await (await page.$('.knob')).boundingBox(); await page.mouse.move(k.x + 20, k.y + 20); await page.mouse.down(); await wait(2500); await page.mouse.up(); },
+  async debris() {
+    for (let i = 0; i < 80 && await page.$('.turret canvas'); i++) {
+      const t = await page.$eval('.turret canvas', (c) => { const r = c._targets.find((x) => !x.boom && x.x > 20 && x.x < 340); return r ? [r.x + r.vx * 0.05, r.y + r.vy * 0.05] : null; });
+      if (t) { const p = await canvasClick('.turret canvas', t[0], t[1]); await page.mouse.click(p.x, p.y); }
+      await wait(120);
+    }
+  },
+  async shields() { for (const h of await page.$$('.hex.red')) await h.click(); },
+  async fuel() { const b = await (await page.$('.hold-fuel')).boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down(); await wait(3600); await page.mouse.up(); },
+  async divert() { const h = await (await page.$('.sl.target .handle')).boundingBox(); await page.mouse.move(h.x + 10, h.y + 10); await page.mouse.down(); for (let i = 1; i <= 10; i++) { await page.mouse.move(h.x + 10, h.y + 10 - i * 16); await wait(20); } await page.mouse.up(); },
+  async accept() { await page.click('.accept button'); },
+  async simon() {
+    const seq = await page.$eval('.pads', (p) => p._seq);
+    for (let round = 1; round <= 5; round++) {
+      await page.waitForFunction((r) => document.querySelector('.mg-status')?.textContent.includes(`repita ${r} luz`), round, { timeout: 8000 });
+      for (let k = 0; k < round; k++) { await page.click(`.pad >> nth=${seq[k]}`); await wait(120); }
+      await wait(200);
+    }
+  },
+  async manifold() { for (let n = 1; n <= 10; n++) await page.click(`.valve:text-is("${n}")`); },
+  async sample() {
+    if (await page.$('.tube.bad')) await page.click('.tube.bad');
+    else { await page.click('.sample button'); await wait(1200); }
+  },
+  async filter() {
+    for (let i = 0; i < 10 && await page.$('.filterbox canvas'); i++) {
+      const d = await page.$eval('.filterbox canvas', (c) => { const x = c._targets.find((t) => !t.gone); return x ? [x.x, x.y] : null; });
+      if (!d) break;
+      const a = await canvasClick('.filterbox canvas', d[0], d[1]);
+      const b = await canvasClick('.filterbox canvas', 20, 120);
+      await page.mouse.move(a.x, a.y); await page.mouse.down();
+      for (let k = 1; k <= 8; k++) { await page.mouse.move(a.x + ((b.x - a.x) * k) / 8, a.y + ((b.y - a.y) * k) / 8); await wait(15); }
+      await page.mouse.up(); await wait(100);
+    }
+  },
+  async steering() {
+    const p0 = await page.$eval('.steer canvas', (c) => [c._targets[0].x, c._targets[0].y]);
+    const a = await canvasClick('.steer canvas', p0[0], p0[1]);
+    const b = await canvasClick('.steer canvas', 150, 150);
+    await page.mouse.move(a.x, a.y); await page.mouse.down();
+    for (let k = 1; k <= 10; k++) { await page.mouse.move(a.x + ((b.x - a.x) * k) / 10, a.y + ((b.y - a.y) * k) / 10); await wait(15); }
+    await page.mouse.up(); await wait(700);
+  },
   async wires() {
     const left = await page.$$('.wires-col.left .wire-term');
     for (const l of left) {
@@ -166,12 +231,14 @@ async function clickUntilDone(sel, delay) {
 }
 
 const results = [];
-const tasks = await page.evaluate(() => window.__senai.app.game.local.tasks.map((t) => [t.stationId, window.__senai.app.game.map.stationById[t.stationId].task]));
-for (const [id, type] of tasks) {
+const tasks = await page.evaluate(() => window.__senai.app.game.local.tasks.map((t, i) => [t.stationId, window.__senai.app.game.map.stationById[t.stationId].task + (t.phase2 ? '(fase 2)' : ''), i]));
+for (const [id, type, idx] of tasks) {
+  // As tarefas são abertas uma de cada vez: as outras ficam marcadas como concluídas enquanto isso.
+  await page.evaluate((idx) => { const ts = window.__senai.app.game.local.tasks; ts.forEach((t, i) => { t._was = t._was ?? t.done; t.done = i !== idx ? true : t.done; }); }, idx);
   await openStation(id);
-  try { await solvers[type](); } catch (e) { errors.push(`${type}: ${e.message}`); }
+  try { await solvers[type.replace('(fase 2)', '')](); } catch (e) { errors.push(`${type}: ${e.message}`); }
   await page.waitForSelector('.mg-overlay', { state: 'detached', timeout: 15000 }).catch(() => {});
-  const done = await page.evaluate((id) => window.__senai.app.game.local.tasks.find((t) => t.stationId === id).done, id);
+  const done = await page.evaluate((idx) => { const ts = window.__senai.app.game.local.tasks; const t = ts[idx]; const ok = t.done || t.step > 0 && !t.phase2; ts.forEach((x, i) => { if (i !== idx) x.done = x._was; }); return ok; }, idx);
   results.push(`${type}:${done ? 'OK' : 'FALHOU'}`);
   if (await page.$('.mg-overlay')) await page.keyboard.press('Escape');
 }
