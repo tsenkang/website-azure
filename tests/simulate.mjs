@@ -2,10 +2,11 @@
 // Uso: node tests/simulate.mjs [partidas]
 import { Game } from '../js/core/game.js';
 import { buildMap, isSolid } from '../js/core/map.js';
+import { MAP_LIST } from '../js/core/maps/index.js';
 import { TILE as T } from '../js/config.js';
 
-function validateMap() {
-  const map = buildMap();
+function validateMap(mapId) {
+  const map = buildMap(mapId);
   const start = [Math.floor(map.spawn.px / T), Math.floor(map.spawn.py / T)];
   const seen = new Uint8Array(map.W * map.H);
   const q = [start];
@@ -22,7 +23,7 @@ function validateMap() {
   const points = [
     ...map.stations.map((s) => [s.id, s.stand]),
     ...map.fixPoints.map((f) => [f.id, f.stand]),
-    ['emergency', map.emergency.stand], ['cameras', map.cameraConsole.stand],
+    ['emergency', map.emergency.stand], ['cameras', map.cameraConsole.stand], ['admin', map.adminConsole.stand],
     ...map.vents.map((v) => [v.id, v.stand]),
   ];
   const bad = points.filter(([, s]) => !seen[s.ty * map.W + s.tx]).map(([id]) => id);
@@ -31,19 +32,22 @@ function validateMap() {
     for (let y = r.y; y < r.y + r.h && !reach; y++) for (let x = r.x; x < r.x + r.w; x++) if (seen[y * map.W + x]) { reach = true; break; }
     if (!reach) bad.push(`sala:${r.id}`);
   }
-  if (bad.length) throw new Error(`Pontos inalcançáveis: ${bad.join(', ')}`);
-  console.log(`Mapa OK: ${map.stations.length} estações, ${map.vents.length} dutos, ${map.rooms.length} áreas, todas alcançáveis.`);
+  if (bad.length) throw new Error(`[${mapId}] Pontos inalcançáveis: ${bad.join(', ')}`);
+  console.log(`Mapa ${map.name} OK: ${map.stations.length} estações, ${map.vents.length} dutos, ${map.rooms.length} áreas, todas alcançáveis.`);
 }
 
 function runMatch(i, settings) {
   const g = new Game({ settings, allBots: true });
+  // Nenhum bot fica preso em um duto quando a partida termina.
+  g.on('end', () => { const stuck = g.players.filter((p) => p.inVent && p.alive); if (stuck.length > 1) counts.stuckInVent = stuck.length; });
   const counts = { kills: 0, meetings: 0, ejections: 0, sabotages: 0, tasks: 0, vents: 0, fixes: 0 };
   g.on('kill', () => counts.kills++);
   g.on('meetingStart', () => counts.meetings++);
   g.on('eject', (r) => { if (r.ejected) counts.ejections++; });
   g.on('sabotage', () => counts.sabotages++);
   g.on('taskDone', () => counts.tasks++);
-  g.on('vent', () => counts.vents++);
+  g.on('ventEnter', () => counts.vents++);
+  g.on('chat', () => counts.chat = (counts.chat || 0) + 1);
   g.on('sabotageEnd', (e) => { if (e.who) counts.fixes++; });
   const dt = 1 / 30;
   let steps = 0;
@@ -51,18 +55,18 @@ function runMatch(i, settings) {
   while (g.phase !== 'ended' && steps < 30 * 60 * 25) { g.update(dt); steps++; }
   const ms = Date.now() - t0;
   const r = g.result;
-  console.log(`#${i} [${settings.difficulty}, ${settings.players}j/${settings.impostors}imp] ` +
+  console.log(`#${i} [${settings.map}, ${settings.difficulty}, ${settings.players}j/${settings.impostors}imp] ` +
     (r ? `${r.winner === 'crew' ? 'ALUNOS' : 'IMPOSTORES'} venceram em ${Math.round(r.duration)}s — ${r.reason}` : 'SEM FIM (timeout)') +
     ` | ${JSON.stringify(counts)} | ${ms}ms`);
   return r;
 }
 
-validateMap();
+for (const m of MAP_LIST) validateMap(m.id);
 const n = Number(process.argv[2] || 12);
 const diffs = ['facil', 'normal', 'dificil'];
 const wins = { crew: 0, impostor: 0, none: 0 };
 for (let i = 0; i < n; i++) {
-  const settings = { difficulty: diffs[i % 3], players: 6 + (i % 5), impostors: 1 + (i % 2), tasksPerPlayer: 5, discussionTime: 5, votingTime: 15 };
+  const settings = { map: MAP_LIST[i % MAP_LIST.length].id, difficulty: diffs[i % 3], players: 6 + (i % 5), impostors: 1 + (i % 2), tasksPerPlayer: 5, discussionTime: 5, votingTime: 15 };
   const r = runMatch(i, settings);
   wins[r ? r.winner : 'none']++;
 }

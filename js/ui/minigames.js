@@ -3,6 +3,7 @@ import { audio } from '../audio.js';
 import * as technical from './games/technical.js';
 import * as knowledge from './games/knowledge.js';
 import * as simple from './games/simple.js';
+import { icon } from './icons.js';
 
 const GAMES = {
   wires: technical.wires,
@@ -19,6 +20,7 @@ const GAMES = {
   wait: simple.wait,
   switches: simple.switches,
   hold: simple.hold,
+  scan: simple.scan,
 };
 
 export const HELP = {
@@ -36,6 +38,7 @@ export const HELP = {
   wait: 'Inicie o processo e aguarde terminar sem fechar a janela.',
   switches: 'Ligue todos os disjuntores do quadro.',
   hold: 'Mantenha o botão pressionado até estabilizar.',
+  scan: 'Tarefa visual: quem estiver por perto vê o escaneamento acontecer.',
 };
 
 export function openMinigame(type, { title, subtitle, variant, onComplete, onClose }) {
@@ -45,7 +48,7 @@ export function openMinigame(type, { title, subtitle, variant, onComplete, onClo
     <div class="mg-panel" role="dialog" aria-label="${title}">
       <header class="mg-head">
         <div><h3>${title}</h3><p>${subtitle || HELP[type] || ''}</p></div>
-        <button class="mg-close" title="Fechar (Esc)" aria-label="Fechar">✕</button>
+        <button class="x-btn" title="Fechar (Esc)" aria-label="Fechar">${icon('close')}</button>
       </header>
       <div class="mg-body"></div>
       <footer class="mg-status"></footer>
@@ -78,7 +81,7 @@ export function openMinigame(type, { title, subtitle, variant, onComplete, onClo
     },
     fail(text) { audio.error(); api.setStatus(text, 'bad'); overlay.querySelector('.mg-panel').classList.add('shake'); setTimeout(() => overlay.querySelector('.mg-panel')?.classList.remove('shake'), 400); },
   };
-  overlay.querySelector('.mg-close').addEventListener('click', () => { audio.click(); close(false); });
+  overlay.querySelector('.x-btn').addEventListener('click', () => { audio.click(); close(false); });
   overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay) close(false); });
   cleanup = (GAMES[type] || simple.wait)(body, api) || null;
   return { close: () => close(false), get done() { return done; } };

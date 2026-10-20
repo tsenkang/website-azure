@@ -1,8 +1,8 @@
 // Renderizador principal: câmera, mundo, personagens, efeitos, neblina de visão e indicadores.
 import { TILE as T } from '../config.js';
-import { buildStaticLayer, buildMinimapBase } from './world.js';
+import { buildStaticLayer, buildMinimapBase, drawVent } from './world.js';
 import { drawAnimated, ANIMATED_TYPES } from './furniture.js';
-import { drawCharacter, drawKnockedOut, drawStar, roundRect } from './sprites.js';
+import { drawCharacter, drawKnockedOut, drawStar, roundRect, INK } from './sprites.js';
 import { castRay } from '../core/physics.js';
 
 export class Renderer {
@@ -17,6 +17,7 @@ export class Renderer {
     this.t = 0;
     this.game = null;
     this.targets = []; // alvos de seta (tutorial)
+    this.ventArrows = []; // setas clicáveis quando o jogador local está escondido no duto
     this.resize();
   }
 
@@ -49,6 +50,7 @@ export class Renderer {
     const g = this.game;
     return g.players.filter((p) => {
       if (p === viewer) return true;
+      if (p.inVent) return false;
       if (!p.alive) return !viewer.alive && !p.ejected; // fantasmas só são vistos por fantasmas
       if (!viewer.alive) return true;
       return g.canSee(viewer, p);
@@ -94,7 +96,7 @@ export class Renderer {
       }
     }
 
-    if (!opts.camera) this.drawMarkers(ctx);
+    if (!opts.camera && !this.demo) this.drawMarkers(ctx);
 
     // Corpos
     for (const b of g.bodies) {
@@ -105,13 +107,70 @@ export class Renderer {
     }
 
     // Jogadores ordenados por profundidade
-    const list = opts.camera ? g.players.filter((p) => p.alive) : this.visiblePlayersFor(g.local);
+    const list = opts.camera ? g.players.filter((p) => p.alive && !p.inVent) : this.visiblePlayersFor(g.local);
     const sorted = list.filter((p) => inView(p.x, p.y)).sort((a, b) => a.y - b.y);
     for (const p of sorted) {
+      const vs = this.visualOf(p);
+      if (vs) this.drawVisualFx(ctx, p, vs, 'under');
+      if (p.inVent) {
+        // O próprio impostor escondido: só a tampa aberta do duto aparece.
+        const v = g.map.ventById[p.inVent];
+        drawVent(ctx, v.x * T, v.y * T, true);
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.beginPath(); ctx.ellipse(p.x - 4, p.y - 2, 2.2, 3, 0, 0, Math.PI * 2); ctx.ellipse(p.x + 4, p.y - 2, 2.2, 3, 0, 0, Math.PI * 2); ctx.fill();
+        continue;
+      }
       drawCharacter(ctx, p.x, p.y, { look: p.look, facing: p.facing, moving: p.moving, t: p.animT, ghost: !p.alive, seed: p.id });
-      if (p.busy && p.busy.kind !== 'minigame') this.drawBusy(ctx, p);
+      if (vs) this.drawVisualFx(ctx, p, vs, 'over');
+      if (p === g.local && p.busy && p.busy.kind !== 'minigame') this.drawBusy(ctx, p);
     }
     return sorted;
+  }
+
+  visualOf(p) {
+    const g = this.game;
+    return g.visualTaskOf(p) || (p.netVisual ? g.map.stationById[p.netVisual] : null);
+  }
+
+  // Animações das tarefas visuais (provam que quem está fazendo é aluno).
+  drawVisualFx(ctx, p, s, layer) {
+    const t = this.t;
+    if (s.visual === 'scan') {
+      if (layer === 'under') {
+        ctx.fillStyle = 'rgba(60,240,160,0.18)';
+        ctx.beginPath(); ctx.ellipse(p.x, p.y + 10, 20, 8, 0, 0, Math.PI * 2); ctx.fill();
+        return;
+      }
+      const grad = ctx.createLinearGradient(0, p.y - 42, 0, p.y + 12);
+      grad.addColorStop(0, 'rgba(60,240,160,0)'); grad.addColorStop(1, 'rgba(60,240,160,0.28)');
+      ctx.fillStyle = grad; ctx.fillRect(p.x - 16, p.y - 42, 32, 54);
+      for (let i = 0; i < 3; i++) {
+        const yy = p.y + 10 - ((t * 38 + i * 17) % 52);
+        ctx.strokeStyle = `rgba(80,255,170,${0.9 - i * 0.2})`; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.ellipse(p.x, yy, 15, 5, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+    } else if (layer === 'over' && s.visual === 'sparks') {
+      for (let i = 0; i < 9; i++) {
+        const a = -Math.PI / 2 + (Math.sin(t * 13 + i * 2.1) * 1.3);
+        const len = 6 + ((t * 60 + i * 13) % 16);
+        ctx.strokeStyle = i % 2 ? '#ffe066' : '#ff9a2e'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(s.px, s.py - 6); ctx.lineTo(s.px + Math.cos(a) * len, s.py - 6 + Math.sin(a) * len); ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(255,240,180,0.9)'; ctx.beginPath(); ctx.arc(s.px, s.py - 6, 3 + Math.random() * 2, 0, Math.PI * 2); ctx.fill();
+    } else if (layer === 'under' && s.visual === 'glow') {
+      const r = 26 + Math.sin(t * 6) * 6;
+      const g = ctx.createRadialGradient(s.px, s.py - 10, 2, s.px, s.py - 10, r);
+      g.addColorStop(0, 'rgba(120,220,255,0.75)'); g.addColorStop(1, 'rgba(120,220,255,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(s.px, s.py - 10, r, 0, Math.PI * 2); ctx.fill();
+    } else if (layer === 'over' && s.visual === 'trash') {
+      const k = (t * 0.9) % 1;
+      const bx = s.px + 6, by = s.py - 30 + k * 26;
+      ctx.globalAlpha = 1 - Math.max(0, k - 0.8) * 5;
+      ctx.fillStyle = '#2b2f36'; ctx.beginPath(); ctx.ellipse(bx, by, 6, 7, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.lineWidth = 1.6; ctx.strokeStyle = INK; ctx.stroke();
+      ctx.fillStyle = '#f2c230'; ctx.fillRect(bx - 1.5, by - 9, 3, 3);
+      ctx.globalAlpha = 1;
+    }
   }
 
   drawBusy(ctx, p) {
@@ -189,8 +248,8 @@ export class Renderer {
     const visible = this.drawWorld(ctx, this.cam.x, this.cam.y, zoom, w, h, dpr);
     this.drawEffects(ctx, dt);
 
-    // Neblina de visão
-    if (me.alive) {
+    // Neblina de visão (o menu mostra o mapa inteiro)
+    if (me.alive && !this.demo) {
       const R = g.visionOf(me);
       const poly = this.computeVisibility(me.x, me.y, R);
       const f = this.fctx;
@@ -223,17 +282,24 @@ export class Renderer {
   drawName(ctx, p) {
     const g = this.game;
     const me = g.local;
+    if (p.inVent) return;
     const teammate = me.isImpostor && p.isImpostor;
-    const text = p.name + (p.isBot ? ' [BOT]' : '');
-    ctx.font = 'bold 10px "Segoe UI", Arial, sans-serif';
+    const y = p.y - (p.alive ? 44 : 50);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const tw = ctx.measureText(text).width + 8;
-    const y = p.y - (p.alive ? 40 : 46);
-    ctx.fillStyle = 'rgba(10,16,28,0.55)';
-    roundRect(ctx, p.x - tw / 2, y - 7, tw, 14, 6); ctx.fill();
-    ctx.fillStyle = teammate ? '#ff6b6b' : p === me ? '#ffe28a' : '#ffffff';
-    if (!p.alive) ctx.fillStyle = 'rgba(220,230,255,0.7)';
-    ctx.fillText(text, p.x, y + 0.5);
+    ctx.lineJoin = 'round';
+    ctx.font = '800 11px "Nunito", "Segoe UI", Arial, sans-serif';
+    ctx.lineWidth = 3.5; ctx.strokeStyle = INK;
+    ctx.strokeText(p.name, p.x, y);
+    ctx.fillStyle = teammate ? '#ff6b6b' : '#ffffff';
+    if (!p.alive) ctx.fillStyle = 'rgba(220,230,255,0.75)';
+    ctx.fillText(p.name, p.x, y);
+    if (p.isBot) {
+      const tw = ctx.measureText(p.name).width;
+      ctx.font = '800 7px "Nunito", "Segoe UI", sans-serif';
+      ctx.fillStyle = '#26344d'; roundRect(ctx, p.x + tw / 2 + 3, y - 5, 20, 10, 3); ctx.fill();
+      ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.fillStyle = '#9fc0ff'; ctx.fillText('BOT', p.x + tw / 2 + 13, y + 0.5);
+    }
   }
 
   drawEffects(ctx, dt) {
@@ -246,7 +312,11 @@ export class Renderer {
           ctx.fillStyle = `rgba(230,235,245,${0.7 * (1 - k)})`;
           ctx.beginPath(); ctx.arc(e.x + Math.cos(a) * k * 26, e.y - 10 + Math.sin(a) * k * 18, 9 * (1 - k * 0.5), 0, Math.PI * 2); ctx.fill();
         }
-        if (k < 0.4) { ctx.fillStyle = '#ffd84a'; ctx.font = 'bold 18px "Segoe UI", sans-serif'; ctx.textAlign = 'center'; ctx.fillText('POW!', e.x, e.y - 34 - k * 20); }
+        if (k < 0.45) {
+          ctx.font = '800 20px "Baloo 2", "Nunito", sans-serif'; ctx.textAlign = 'center'; ctx.lineJoin = 'round';
+          ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.strokeText('POW!', e.x, e.y - 34 - k * 20);
+          ctx.fillStyle = '#ffd84a'; ctx.fillText('POW!', e.x, e.y - 34 - k * 20);
+        }
       } else if (e.type === 'vent') {
         ctx.fillStyle = `rgba(160,170,190,${0.6 * (1 - k)})`;
         for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.arc(e.x + Math.sin(i * 2 + k * 6) * 12, e.y - k * 30 - i * 3, 6 * (1 - k), 0, Math.PI * 2); ctx.fill(); }
@@ -266,6 +336,7 @@ export class Renderer {
 
   drawScreenOverlays(ctx) {
     const g = this.game;
+    if (this.demo) { this.ventArrows = []; return; }
     const { w, h } = this;
     const sab = g.sabotage.active;
     if (sab?.type === 'critical') {
@@ -279,6 +350,29 @@ export class Renderer {
     if (sab && g.local.alive) for (const [id, fixed] of Object.entries(sab.fixed)) if (!fixed) arrows.push({ x: g.map.fixById[id].px, y: g.map.fixById[id].py, color: '#ff4b3e' });
     for (const t of this.targets) arrows.push({ ...t, color: t.color || '#ffd640' });
     for (const a of arrows) this.drawArrow(ctx, a);
+    this.drawVentArrows(ctx);
+  }
+
+  // Escondido no duto: setas clicáveis apontando para as outras saídas da mesma rede.
+  drawVentArrows(ctx) {
+    const g = this.game, me = g.local;
+    this.ventArrows = [];
+    if (!me.inVent) return;
+    const sx = (me.x - this.cam.x) * this.zoom + this.w / 2, sy = (me.y - this.cam.y) * this.zoom + this.h / 2;
+    for (const v of g.ventLinks(me.inVent)) {
+      const ang = Math.atan2(v.py - me.y, v.px - me.x);
+      const r = 86;
+      const ax = sx + Math.cos(ang) * r, ay = sy + Math.sin(ang) * r;
+      this.ventArrows.push({ id: v.id, x: ax, y: ay, ang, room: g.roomName(v.room) });
+      ctx.save(); ctx.translate(ax, ay); ctx.rotate(ang);
+      ctx.beginPath(); ctx.moveTo(26, 0); ctx.lineTo(-10, -20); ctx.lineTo(-2, 0); ctx.lineTo(-10, 20); ctx.closePath();
+      ctx.fillStyle = '#ff5b4f'; ctx.fill(); ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeStyle = INK; ctx.stroke();
+      ctx.restore();
+      ctx.font = '800 12px "Nunito", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const lx = sx + Math.cos(ang) * (r + 36), ly = sy + Math.sin(ang) * (r + 30);
+      ctx.lineWidth = 4; ctx.strokeStyle = INK; ctx.strokeText(g.roomName(v.room), lx, ly);
+      ctx.fillStyle = '#fff'; ctx.fillText(g.roomName(v.room), lx, ly);
+    }
   }
 
   drawArrow(ctx, a) {
@@ -326,12 +420,12 @@ export class Renderer {
     if (offline) {
       for (let i = 0; i < 400; i++) { ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.25})`; ctx.fillRect(Math.random() * w, Math.random() * h, 3, 3); }
       ctx.fillStyle = 'rgba(10,15,25,0.6)'; ctx.fillRect(0, 0, w, h);
-      ctx.fillStyle = '#ff6b5b'; ctx.font = `bold ${Math.max(11, w / 22)}px "Segoe UI", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#ff6b5b'; ctx.font = `800 ${Math.max(11, w / 22)}px "Nunito", "Segoe UI", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(g.sabotage.gpsOff ? 'GPS OFFLINE' : 'SEM SINAL DE WI-FI', w / 2, h / 2);
       return { s, ox, oy };
     }
     const pulse = 0.5 + Math.sin(this.t * 5) * 0.5;
-    for (const t of g.local.tasks) {
+    for (const t of opts.admin ? [] : g.local.tasks) {
       if (t.done) continue;
       const st = g.map.stationById[t.stationId];
       const [x, y] = P(st.px, st.py);
@@ -349,15 +443,17 @@ export class Renderer {
         if (r.corridor) continue;
         const locked = g.sabotage.doorLocks[r.id];
         const [x, y] = P(r.cx, r.cy + r.h * T * 0.28);
-        ctx.fillStyle = locked ? '#ff4b3e' : 'rgba(255,255,255,0.85)';
-        ctx.font = `bold ${Math.max(10, w / 70)}px "Segoe UI", sans-serif`; ctx.textAlign = 'center';
-        ctx.fillText(locked ? '🔒 trancada' : '🚪 trancar', x, y);
+        ctx.font = `800 ${Math.max(10, w / 70)}px "Nunito", "Segoe UI", sans-serif`; ctx.textAlign = 'center';
+        ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.lineJoin = 'round';
+        const txt = locked ? 'TRANCADA' : 'TRANCAR PORTAS';
+        ctx.strokeText(txt, x, y);
+        ctx.fillStyle = locked ? '#ff6b5b' : '#ffd640'; ctx.fillText(txt, x, y);
       }
     }
     if (opts.big) {
       ctx.fillStyle = 'rgba(232,238,246,0.92)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       const fs = Math.max(10, Math.round(w / 64));
-      ctx.font = `600 ${fs}px "Inter", "Segoe UI", sans-serif`;
+      ctx.font = `800 ${fs}px "Nunito", "Segoe UI", sans-serif`;
       for (const r of g.map.rooms) {
         if (r.corridor) continue;
         const [x, y] = P(r.cx, r.y * T + T * 1.6);
@@ -372,6 +468,24 @@ export class Renderer {
     }
     if (g.local.isImpostor && opts.big) {
       for (const v of g.map.vents) { const [x, y] = P(v.px, v.py); ctx.fillStyle = '#9aa5b5'; ctx.fillRect(x - 3, y - 3, 6, 6); }
+    }
+    if (opts.admin) {
+      // Admin: bonequinhos anônimos por sala.
+      const counts = g.adminCounts() || {};
+      for (const r of g.map.rooms) {
+        const n = counts[r.id] || 0;
+        if (!n) continue;
+        const size = Math.max(7, w / 90);
+        const totalW = n * size * 1.5;
+        const [cx, cy] = P(r.cx, r.cy + (r.corridor ? 0 : r.h * T * 0.15));
+        for (let i = 0; i < n; i++) {
+          const x = cx - totalW / 2 + i * size * 1.5 + size * 0.75;
+          ctx.fillStyle = '#f2f5f9'; ctx.strokeStyle = INK; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(x, cy - size * 0.55, size * 0.45, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          roundRect(ctx, x - size * 0.5, cy - size * 0.1, size, size * 0.9, size * 0.35); ctx.fill(); ctx.stroke();
+        }
+      }
+      return { s, ox, oy };
     }
     const [mx, my] = P(g.local.x, g.local.y);
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(mx, my, Math.max(3.5, 5 * (w / 600)), 0, Math.PI * 2); ctx.fill();

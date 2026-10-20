@@ -5,7 +5,7 @@ const require = createRequire(import.meta.url);
 let chromium;
 try { ({ chromium } = require('playwright')); } catch { ({ chromium } = require('/opt/node22/lib/node_modules/playwright')); }
 
-const URL = process.argv[2] || 'http://localhost:8123/index.html';
+const URL = process.argv[2] || 'http://localhost:8080/index.html';
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const errors = [];
@@ -152,6 +152,7 @@ const solvers = {
     }
   },
   async wait() { await page.click('.waiter button'); await wait(9800); },
+  async scan() { await wait(8800); },
   async switches() { for (const b of await page.$$('.breaker:not(.on)')) await b.click(); },
   async hold() { const b = await (await page.$('.hold-btn')).boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down(); await wait(2900); await page.mouse.up(); },
 };

@@ -254,7 +254,11 @@ export function robot(root, api) {
 
 // ---------- Medidor (parar o ponteiro na faixa verde) ----------
 export function gauge(root, api) {
-  const labels = { oficina_torno: 'Rotação do torno (RPM)', labtec_estabilidade: 'Tensão do gerador (V)', manut_caldeira: 'Pressão da caldeira (bar)' };
+  const labels = {
+    oficina_torno: 'Rotação do torno (RPM)', labtec_estabilidade: 'Tensão do gerador (V)', manut_caldeira: 'Pressão da caldeira (bar)',
+    doca_esteira: 'Velocidade da esteira (m/min)', camara_temp: 'Temperatura da câmara (°C)', pint_pressao: 'Pressão da pistola (psi)',
+    fun_solda: 'Corrente de solda (A)', linha_torque: 'Torque do parafuso (N·m)',
+  };
   root.innerHTML = `<div class="gauge"><canvas width="320" height="190"></canvas><div class="gauge-label">${labels[api.variant] || 'Medidor'}</div>
     <div class="gauge-hits"><i></i><i></i><i></i></div><button class="btn primary big">PARAR</button></div>`;
   const cv = root.querySelector('canvas');

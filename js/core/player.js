@@ -38,6 +38,7 @@ export class Player {
     this.ventCooldown = 0;
     this.emergencyUses = 1;
     this.busy = null; // tarefa/ação em andamento: { kind, until, ... }
+    this.inVent = null; // id do duto onde o impostor está escondido
     this.speedMul = 1;
     this.stats = { tasksDone: 0, kills: 0, meetingsCalled: 0, reports: 0, votesCast: 0, votesCorrect: 0, timeAlive: 0, sabotages: 0 };
     this.deathTime = null;

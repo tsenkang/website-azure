@@ -1,140 +1,146 @@
 # SENAI: SUSPEITOS 🎮
 
-Jogo de dedução social ambientado numa escola técnica fictícia inspirada no SENAI. Os **alunos** completam tarefas pela escola e tentam descobrir quem está sabotando tudo. Os **impostores** fingem ser alunos, sabotam sistemas e eliminam colegas, sempre dentro da ficção e sem nada gráfico.
+Jogo de dedução social ambientado em escolas técnicas fictícias inspiradas no SENAI. Os **alunos** completam tarefas e tentam descobrir quem está sabotando tudo. Os **impostores** fingem ser alunos, sabotam sistemas e eliminam colegas, sempre dentro da ficção e sem nada gráfico.
 
-> Projeto escolar/de fã, **sem vínculo oficial com o SENAI**. Não usa logotipos. Personagens, mapa, arte e sons são originais e gerados por código.
+Dá para jogar **sozinho contra bots** ou **online com amigos**, com salas por código.
+
+> Projeto escolar/de fã, **sem vínculo oficial com o SENAI**. Não usa logotipos. Personagens, mapas, arte e sons são originais e gerados por código.
 
 ## Como executar
 
-O jogo é estático (HTML + CSS + JavaScript ES modules) e **não tem dependências**. Como usa módulos ES, ele precisa ser servido por HTTP. Abrir o `index.html` direto do disco não funciona.
+### Local (com o modo online)
 
 ```bash
-# opção 1 (Python 3)
-python3 -m http.server 8080
-# opção 2 (Node.js)
-npx serve -l 8080 .
+npm install     # instala só o "ws" (WebSocket)
+npm start       # http://localhost:8080
 ```
 
-Depois é só abrir **http://localhost:8080** no navegador (Chrome, Edge, Firefox ou Safari atuais).
+### Só o single-player (sem servidor)
 
-Para publicar, basta copiar a pasta para qualquer hospedagem estática (Azure Static Web Apps, GitHub Pages, Netlify…). Não há etapa de build.
+Qualquer servidor estático serve, por exemplo `python3 -m http.server 8080`. Abrir o `index.html` direto do disco não funciona, porque o jogo usa módulos ES.
+
+## Publicar online no Render.com
+
+O repositório já vem com o `render.yaml`: um único Web Service serve o jogo e as partidas online, no mesmo endereço.
+
+1. Entre em [render.com](https://render.com) e conecte sua conta do GitHub.
+2. Clique em **New → Blueprint** e escolha este repositório e o branch que tem o jogo. O Render lê o `render.yaml` sozinho.
+3. Confirme em **Apply**. Ele roda `npm install` e `npm start`. A checagem de saúde fica em `/healthz`.
+4. Abra o endereço gerado, por exemplo `https://senai-suspeitos.onrender.com`. Clique em **Online → Criar sala** e mande o código de 4 letras para os amigos.
+
+Se preferir não usar o Blueprint: **New → Web Service**, runtime Node, build `npm install`, start `npm start`.
+
+No plano grátis, o serviço dorme depois de ~15 minutos sem uso. A primeira conexão depois disso leva cerca de 1 minuto, e o jogo avisa quando isso acontece.
+
+Se o jogo estiver hospedado em outro lugar (outro site estático), dá para apontar para o servidor em **Online → Servidor** (`wss://seu-jogo.onrender.com/ws`) ou com `?server=wss://...` na URL.
 
 ## Controles
 
 | Tecla | Ação |
 |---|---|
 | `W A S D` / setas | Andar |
-| `E` | Usar: fazer tarefa, consertar sabotagem, apertar o sinal de emergência, ver câmeras |
+| `E` | Usar: tarefa, conserto, sinal de emergência, câmeras e admin |
 | `R` | Reportar aluno desacordado |
-| `M` / `Tab` | Mapa da escola |
+| `M` / `Tab` | Mapa |
 | `Q` | Eliminar (impostor) |
 | `F` | Painel de sabotagem (impostor) |
-| `V` | Duto de ventilação (impostor) |
+| `V` | Entrar ou sair do duto (impostor). Dentro dele, clique nas setas ou use `W A S D` para escolher a saída. |
+| `Enter` | Escrever no chat da reunião |
 | `Esc` | Fechar janela / pausar |
 
-No celular, arraste o dedo no lado esquerdo da tela para andar e use os botões à direita.
+No celular, arraste no lado esquerdo da tela para andar e use os botões à direita.
 
 ## Regras
 
-- **Os alunos vencem** quando completam todas as tarefas da turma ou encaminham todos os impostores à coordenação.
-- **Os impostores vencem** quando ficam em igualdade numérica com os alunos vivos, ou quando a sabotagem crítica (sobrecarga na subestação) não é resolvida a tempo.
-- **Reuniões:** reporte um corpo ou aperte o sinal de emergência no Pátio (1 vez por jogador). Há uma fase de discussão (com falas rápidas) e depois a votação. Empate, ou "pular" com o mesmo número de votos que o mais votado, não expulsa ninguém.
-- **Eliminados** viram espectros: atravessam paredes e podem terminar as próprias tarefas, mas não votam nem reportam.
+- **Os alunos vencem** quando completam todas as tarefas ou encaminham todos os impostores à coordenação.
+- **Os impostores vencem** quando ficam em igualdade numérica com os alunos vivos, ou quando a sabotagem crítica não é resolvida a tempo.
+- **Reuniões:** reporte um corpo ou aperte o sinal de emergência (1 vez por jogador). Há discussão com **chat livre**, depois a votação. Empate, ou "pular" empatado com o mais votado, não expulsa ninguém.
+- **Eliminados** viram espectros: atravessam paredes e podem terminar as próprias tarefas.
 
-## Funcionalidades implementadas
+## Funcionalidades
 
-**Mapa (13 salas + 4 corredores):** entrada/recepção, sala de aula, laboratório de informática, oficina mecânica, laboratório de eletrônica, oficina de automação, almoxarifado (mais escuro, com estantes que bloqueiam a visão), pátio e cantina, área de manutenção, sala dos professores, laboratório técnico especial e biblioteca técnica. Tem portas, móveis com colisão, sinalização das salas, piso tátil nos corredores e 9 dutos de ventilação em 3 redes.
+**3 mapas**, cada um com 20 a 26 tarefas, 9 dutos em 3 redes, enfermaria com escâner, painel de admin e câmeras:
+- **Unidade Escolar:** oficinas, laboratórios, pátio com cantina, almoxarifado escuro, enfermaria e biblioteca.
+- **Galpão de Logística:** armazém enorme e escuro cheio de estantes, doca de carga, câmara fria, refeitório e simulador de empilhadeira.
+- **Fábrica-Escola Automotiva:** linha de montagem no centro, cabine de pintura, funilaria, laboratório de motores, controle de qualidade e subestação.
 
-**Visual:** vista de cima em 2.5D desenhada em Canvas. Paredes com face frontal, iluminação ambiente por sala e máquinas animadas (braços robóticos, esteira, torno, impressoras 3D, racks de servidor, consoles). Os personagens têm uniforme com faixa refletiva, 12 cores e 7 acessórios (capacete, óculos de proteção, boné, fone, touca, jaleco…), com animação de caminhada, ociosidade e piscada.
+**Visual:** estilo cartoon com contorno escuro grosso, cores chapadas e sombras sólidas, em vista de cima 2.5D.
+- Personagens: alunos com olhos grandes, uniforme com faixa refletiva, 12 cores e 7 acessórios.
+- Interface robusta, com ícones próprios em SVG.
+- O menu fica sobre uma partida de bots rodando ao vivo.
 
-**Visão realista:** campo de visão calculado por raycasting. Paredes e estantes bloqueiam a vista, e só aparece quem está no seu campo de visão.
+**Mecânicas de dedução:**
+- **Duto com esconderijo:** o impostor entra, fica invisível, escolhe a saída pelas setas e sai quando quiser. Quem vê a entrada ou a saída fica sabendo.
+- **Tarefas visuais** (escâner, torno, solda, gerador, lixo): quem estiver perto vê a animação. Impostor não consegue fazê-las. Os bots que veem passam a confiar e defendem você na reunião.
+- **Painel de admin:** contagem anônima de pessoas por sala. Fica fora do ar com o GPS sabotado.
+- **Câmeras de segurança:** imagens ao vivo de quatro pontos do mapa.
+- **Chat livre:** os bots entendem acusações ("foi o Bruno", "vi a Camila no duto"), defesas ("confio na Sofia"), "não fui eu" e perguntas ("Diego, onde você estava?"), que eles respondem.
 
-**12 minijogos funcionais:**
-- conectar cabos (arrastar)
-- circuito com peças giratórias
-- painel de ferramentas
-- calibrar braço robótico
-- medidor (parar o ponteiro na faixa certa)
-- prova / inspeção NR‑10 / catálogo técnico
-- diagnóstico de PC
-- portas lógicas
-- sequências (lanche, diários, livros)
-- teclado de matrícula
-- separar itens (componentes, peças da esteira, reciclagem)
-- processos com espera
+**13 tipos de minijogo funcionais**, com variações por mapa:
+- cabos, circuito, painel de ferramentas, braço robótico, medidor
+- provas (técnica, NR‑10, logística, qualidade, catálogo)
+- diagnóstico de PC e de motor, portas lógicas
+- sequências (lanche, diários, livros, embalagem, mistura de tinta)
+- teclado, separação de itens, processos com espera, escâner médico
 
-**5 sabotagens**, cada uma com efeito visual, duração e forma de resolver:
-- **Apagão:** a visão diminui.
-- **GPS offline:** o minimapa cai.
-- **Pane nas máquinas:** as tarefas de máquina ficam travadas.
-- **Portas trancadas:** as portas de uma sala ficam bloqueadas por 10 s.
-- **Sobrecarga na subestação:** sabotagem crítica com alarme e cronômetro; é preciso resolver dois consoles distantes.
+**5 sabotagens:** apagão, GPS offline, pane nas máquinas, portas trancadas e sobrecarga crítica, que tem dois consoles distantes.
 
 **Bots com IA:**
-- Andam pelo mapa com A* e fazem tarefas com durações variadas.
-- Observam quem viram e onde, testemunham eliminações e uso de dutos, e reportam corpos.
-- Consertam sabotagens e se dividem entre os dois consoles da sabotagem crítica.
-- Como impostores, caçam alunos isolados, checam se há testemunhas, fogem pelos dutos, sabotam e às vezes se reportam.
-- Nas reuniões, falam com base no que realmente viram (álibis, acusações, defesas) e votam pela desconfiança acumulada. Os impostores mentem.
+- Andam com A* e lembram quem viram e onde.
+- Testemunham eliminações, dutos e tarefas visuais.
+- Consertam sabotagens.
+- Como impostores, caçam alunos isolados, checam se há testemunhas, escondem-se nos dutos e esperam a saída ficar livre.
+- Falam e votam com base no que viram.
 - 3 níveis de dificuldade.
-- Todos os bots aparecem como **[BOT]**.
 
-**Reuniões e votação:** a lógica de votação é real. Tem discussão e votação com cronômetro, falas rápidas do jogador (que influenciam os bots), tratamento de empates, revelação dos votos e uma animação de "encaminhado à coordenação" que revela (ou não, se você desligar) o papel de quem saiu.
-
-**Interface:**
-- Menu e lobby (personalização, regras da partida, troca de bots).
-- Revelação do papel.
-- HUD com barra de tarefas da turma, lista de tarefas, minimapa e botões de ação com tempo de recarga.
-- Dicas de interação e setas até os objetivos.
-- Mapa grande e painel de sabotagem com seleção de sala.
-- Câmeras de segurança ao vivo na sala dos professores.
-- Pausa com volume e opção de silenciar.
-- Tela final com estatísticas por jogador e linha do tempo da partida, com revanche.
+**Modo online (servidor autoritativo):**
+- Salas com código, anfitrião que escolhe mapa e regras, bots para completar a sala e até 10 participantes.
+- O servidor guarda papéis, tarefas, eliminações, votos e sabotagens.
+- Cada jogador recebe só o que pode saber. Papéis alheios, quem está no duto e mortes não vistas nunca saem do servidor.
+- O cliente prevê o próprio movimento para ficar suave. O servidor valida velocidade e colisão, recusando teletransporte, e aceita tarefa só com o minijogo aberto pelo tempo mínimo.
+- Se alguém cair, um bot assume o lugar até a pessoa voltar. A reconexão é automática e devolve a mesma personagem.
 
 **Extras:**
-- Tutorial interativo de 6 passos.
-- Eventos aleatórios (piso molhado, hora do lanche, Wi‑Fi caiu).
-- Sons procedurais com Web Audio: passos, sinal da escola, alarme, eliminação, dutos, conclusão de tarefa e ambiente que muda conforme a sala.
+- Tutorial interativo.
+- Eventos aleatórios.
+- Sons procedurais com Web Audio, com ambiente por sala.
+- Estatísticas e linha do tempo no fim da partida.
+- Joystick de toque.
 - Preferências salvas no navegador.
-- Joystick virtual para toque.
 
-## Estrutura do código
+## Estrutura
 
 ```
-index.html            página e HUD
-css/style.css         identidade visual e telas
-js/config.js          constantes, cores, acessórios e dificuldade
-js/core/              lógica da partida (sem DOM: roda no navegador e no Node)
-  map.js              salas, portas, móveis, estações, dutos e grade de colisão
-  physics.js          colisão círculo×tiles, raycasting e linha de visão
-  pathfinding.js      A* com suavização
-  player.js           entidade jogador
-  game.js             estado da partida, ações, regras e vitória
-  ai.js               IA dos bots (tarefas, observação, impostor, reuniões)
-  sabotage.js         sabotagens
-  meeting.js          reuniões e votação
-  events.js           eventos aleatórios
-js/render/            renderização em Canvas (mundo, móveis, personagens, minimapa)
-js/ui/                HUD, telas, reunião, tutorial e minijogos (js/ui/games/)
-js/audio.js           sons procedurais
-js/input.js           teclado e joystick virtual
-js/main.js            controlador: telas, loop e ligação entre os módulos
-tests/                simulação headless e testes no navegador
+index.html, css/style.css, favicon.svg
+server/server.js        servidor HTTP + WebSocket (arquivos do jogo e partidas online)
+server/rooms.js         salas, lobby, partida autoritativa, validação e reconexão
+js/core/                lógica da partida (sem DOM: roda no navegador e no servidor)
+  maps/                 definições dos 3 mapas (salas, portas, móveis, tarefas, dutos)
+  map.js, physics.js, pathfinding.js, player.js, game.js, ai.js
+  sabotage.js, meeting.js, chat.js, events.js
+js/net/protocol.js      o que o servidor envia para cada jogador e como o cliente aplica
+js/net/client.js        cliente WebSocket, cópia local da partida e reconexão
+js/render/              renderização em Canvas (mundo, móveis, personagens, efeitos)
+js/ui/                  HUD, telas, reunião, tutorial, ícones e minijogos
+js/main.js              controlador: telas, loop e ações (local ou online)
+tests/                  simulação headless, testes de navegador e do modo online
+render.yaml             blueprint do Render.com
 ```
 
 ## Testes
 
 ```bash
-npm test                     # valida o mapa e roda 12 partidas completas só com bots (Node)
-npm start                    # em outro terminal, para os testes de navegador:
-npm run test:browser         # Playwright: fluxo completo + resolve cada minijogo pela interface
+npm test               # valida os 3 mapas e roda 12 partidas só com bots (Node)
+npm start              # em outro terminal, para os testes abaixo
+npm run test:online    # 2 clientes WebSocket: sala, partida, reunião, chat, votos, trapaças e reconexão
+node tests/online-browser.mjs   # 2 janelas de navegador jogando online pela interface
+npm run test:browser   # fluxo completo local + resolve os 13 minijogos pela interface
+node tests/features.mjs         # duto, admin, tarefa visual, chat com resposta de bot e mapas
 ```
 
-`tests/smoke.mjs` percorre o menu, o lobby, o movimento, a abertura de tarefas, o mapa, as sabotagens, uma reunião com voto, o fim de partida, o tutorial, uma partida como impostor (com eliminação) e o layout de celular. `tests/minigames.mjs` resolve os 12 minijogos e as 4 sabotagens consertáveis com cliques e arrastes reais e confere se cada um ficou registrado na partida.
+## Pendências
 
-## Pendências (transparência)
-
-- **Multiplayer online (Fase 4): não implementado.** Hoje o jogo é single-player contra bots. A lógica em `js/core/` já não depende do DOM e roda no Node (os testes headless provam isso), então o próximo passo seria um servidor WebSocket/Socket.IO que rode `Game` de forma autoritativa: papéis secretos, eliminações, tarefas e votos ficariam no servidor, e os clientes enviariam só a entrada de controle. Ainda faltam salas, sincronização, validação no servidor e reconexão.
+- Chat dos espectros entre si e chat no lobby online ainda não existem.
 - Os sons são sintetizados, sem trilha musical.
-- O balanceamento foi ajustado com simulações só de bots. Partidas com pessoas podem pedir mais ajuste (tempo de recarga, número de tarefas).
-- Chat livre por texto nas reuniões não existe. As falas são rápidas e pré-definidas, porque os bots não interpretam texto livre.
+- O balanceamento foi ajustado com simulações de bots. Partidas só com pessoas podem pedir ajuste de tempo de recarga e de número de tarefas.
+- No plano grátis do Render a sala some se o servidor reiniciar ou dormir no meio da partida.

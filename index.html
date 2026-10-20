@@ -2,12 +2,14 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>SENAI: Suspeitos</title>
-  <meta name="description" content="Jogo de dedução social ambientado em uma escola técnica: complete tarefas, descubra os impostores e sobreviva à aula." />
+  <meta name="description" content="Jogo de dedução social ambientado em uma escola técnica: complete tarefas, descubra os impostores e sobreviva à aula. Single-player com bots ou online com amigos." />
+  <meta name="theme-color" content="#151a24" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -20,7 +22,7 @@
         <div class="taskbar-track"><i></i></div>
       </div>
       <div class="tasklist">
-        <button class="tasklist-toggle" aria-expanded="true">Minhas tarefas <span>▾</span></button>
+        <button class="tasklist-toggle" aria-expanded="true"><span>Tarefas</span><b>▾</b></button>
         <ul></ul>
       </div>
       <div class="role-chip"></div>
@@ -33,26 +35,27 @@
     </div>
 
     <div class="hud-tr">
-      <canvas class="minimap" width="220" height="146" title="Abrir mapa (M)"></canvas>
+      <canvas class="minimap" width="440" height="292" title="Abrir mapa (M)"></canvas>
       <div class="hud-tr-buttons">
-        <button class="icon-btn" data-action="map" title="Mapa (M)">🗺️</button>
-        <button class="icon-btn" data-action="pause" title="Pausar (Esc)">⏸</button>
+        <button class="icon-btn" data-action="map" title="Mapa (M)"><span data-icon="map"></span></button>
+        <button class="icon-btn" data-action="pause" title="Pausar (Esc)"><span data-icon="pause"></span></button>
       </div>
     </div>
 
     <div class="hud-bc"><div class="prompt hidden"></div></div>
 
     <div class="hud-br">
-      <button class="act" data-action="sabotage" title="Sabotar (F)"><span class="ico">⚠️</span><span class="lbl">SABOTAR</span><kbd>F</kbd><b class="cd"></b></button>
-      <button class="act" data-action="vent" title="Usar duto (V)"><span class="ico">🌀</span><span class="lbl">DUTO</span><kbd>V</kbd></button>
-      <button class="act danger" data-action="kill" title="Eliminar (Q)"><span class="ico">💥</span><span class="lbl">ELIMINAR</span><kbd>Q</kbd><b class="cd"></b></button>
-      <button class="act warn" data-action="report" title="Reportar (R)"><span class="ico">📢</span><span class="lbl">REPORTAR</span><kbd>R</kbd></button>
-      <button class="act primary" data-action="use" title="Usar (E)"><span class="ico">✋</span><span class="lbl">USAR</span><kbd>E</kbd></button>
+      <button class="act" data-action="sabotage" title="Sabotar (F)"><span class="ico" data-icon="sabotage"></span><span class="lbl">SABOTAR</span><kbd>F</kbd><b class="cd"></b></button>
+      <button class="act" data-action="vent" title="Duto de ventilação (V)"><span class="ico" data-icon="vent"></span><span class="lbl">DUTO</span><kbd>V</kbd></button>
+      <button class="act danger" data-action="kill" title="Eliminar (Q)"><span class="ico" data-icon="kill"></span><span class="lbl">ELIMINAR</span><kbd>Q</kbd><b class="cd"></b></button>
+      <button class="act warn" data-action="report" title="Reportar (R)"><span class="ico" data-icon="report"></span><span class="lbl">REPORTAR</span><kbd>R</kbd></button>
+      <button class="act primary" data-action="use" title="Usar (E)"><span class="ico" data-icon="use"></span><span class="lbl">USAR</span><kbd>E</kbd></button>
     </div>
 
     <div id="joy-zone"></div>
     <div id="joy-base"><div id="joy-knob"></div></div>
     <div class="ghost-note hidden"></div>
+    <div class="net-badge hidden"></div>
   </div>
 
   <div id="screens"></div>

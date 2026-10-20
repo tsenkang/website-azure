@@ -1,7 +1,5 @@
 // Constantes globais do jogo SENAI: SUSPEITOS.
 export const TILE = 32;
-export const MAP_W = 88;
-export const MAP_H = 58;
 
 export const PLAYER_RADIUS = 10;
 export const BASE_SPEED = 145; // px/s
@@ -78,6 +76,8 @@ export const DEFAULT_SETTINGS = {
   tasksPerPlayer: 5,
   revealRoles: true,
   rolePref: 'aleatorio',
-  discussionTime: 12,
-  votingTime: 35,
+  discussionTime: 15,
+  votingTime: 45,
+  map: 'unidade',
+  visualTasks: true,
 };

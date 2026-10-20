@@ -4,7 +4,7 @@ import { findPath } from './pathfinding.js';
 import { lineOfSight } from './physics.js';
 import { SABOTAGES } from './sabotage.js';
 
-const TASK_DUR = { tools: 11, gauge: 7, wires: 7, circuit: 11, robot: 11, sort: 8, quiz: 9, wait: 12, sequence: 8, diag: 11, logic: 8, keypad: 6 };
+const TASK_DUR = { tools: 11, gauge: 7, wires: 7, circuit: 11, robot: 11, sort: 8, quiz: 9, wait: 12, sequence: 8, diag: 11, logic: 8, keypad: 6, scan: 10 };
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -42,6 +42,7 @@ export class BotBrain {
     this.repathT = 0;
     this.fakeIdx = 0;
     this.defenses = 0;
+    this.cleared = {}; // quem foi visto fazendo tarefa visual (prova de inocência)
   }
 
   get diff() { return this.g.diff; }
@@ -67,6 +68,11 @@ export class BotBrain {
         if (arr.length > 40) arr.shift();
       }
       if (dist(p, q) < 5 * T) this.together[q.id] = (this.together[q.id] || 0) + 0.3;
+      const visual = g.visualTaskOf(q);
+      if (visual && !this.cleared[q.id]) {
+        this.cleared[q.id] = { station: visual.id, room: visual.room, t: g.time };
+        this.addSus(q.id, -70);
+      }
     }
     for (const b of g.bodies) {
       if (this.seenBodies.has(b.id) || b.dummy) continue;
@@ -187,12 +193,27 @@ export class BotBrain {
     if (a.kind === 'vent') {
       const v = a.vent;
       if (Math.hypot(v.px - p.x, v.py - p.y) < 8) {
-        const others = g.map.vents.filter((o) => o.group === v.group && o !== v);
-        g.useVent(p, pick(others).id);
-        this.pending = null;
-        this.clearGoal();
-        this.idleUntil = g.time + rand(0.5, 1.5);
+        if (g.enterVent(p)) {
+          this.pending = { kind: 'inVent', at: g.time, until: g.time + rand(1, 2.5), hops: 0 };
+          this.clearGoal();
+        } else this.pending = null;
       } else if (!this.setGoal(v.px, v.py, 'vent', v)) this.pending = null;
+      return true;
+    }
+    if (a.kind === 'inVent') {
+      // Escondido no duto: troca de saída algumas vezes e só sai quando ninguém está olhando.
+      if (!p.inVent) { this.pending = null; return false; }
+      if (g.time < a.until) return true;
+      const exitPoint = { x: p.x, y: p.y };
+      const watched = g.players.some((q) => q.alive && !q.isImpostor && q !== p && Math.hypot(q.x - exitPoint.x, q.y - exitPoint.y) < g.visionOf(q) && lineOfSight(g.map, q.x, q.y, exitPoint.x, exitPoint.y));
+      if ((a.hops < 1 || watched || Math.random() < 0.35) && a.hops < 4) {
+        g.moveVent(p, pick(g.ventLinks(p.inVent)).id);
+        a.hops++;
+        a.until = g.time + rand(0.8, 2);
+      } else if (g.exitVent(p)) {
+        this.pending = null;
+        this.idleUntil = g.time + rand(0.3, 1);
+      }
       return true;
     }
     if (a.kind === 'flee') {
@@ -431,6 +452,12 @@ export class BotBrain {
         const v = g.playerById(vent.who);
         push(`${v.name} saiu de um duto de ventilação ${roomP(vent.room)}! Aluno normal não faz isso.`, { target: v.id, strength: 60 }, 2);
       }
+      const clearedIds = Object.keys(this.cleared).map(Number).filter((id) => g.playerById(id).alive && g.playerById(id) !== p);
+      if (clearedIds.length && Math.random() < 0.85) {
+        const c = g.playerById(clearedIds[0]);
+        const s = g.map.stationById[this.cleared[c.id].station];
+        push(`Eu vi ${c.name} fazendo "${s.name.toLowerCase()}" ${roomP(s.room)}. Tarefa visual: ${c.name} é aluno(a) com certeza.`, { target: c.id, strength: -45 });
+      }
       if (!kill && !vent) {
         const top = aliveOthers.map((q) => [q, this.sus[q.id] || 0]).sort((a, b) => b[1] - a[1])[0];
         if (top && top[1] >= 22) {
@@ -467,7 +494,8 @@ export class BotBrain {
     const { g, p } = this;
     const st = g.meeting.state;
     if (targetId === p.id) {
-      if (strength > 0) {
+      // Só rebate acusações de verdade (evita bots se defendendo em loop).
+      if (strength >= 15) {
         if (!p.isImpostor) this.addSus(speaker.id, 15);
         if (this.defenses < 2 && st) {
           this.defenses++;
@@ -484,6 +512,19 @@ export class BotBrain {
     if (p.isImpostor) return;
     const cred = Math.max(0.1, Math.min(1, 1 - (this.sus[speaker.id] || 0) / 100));
     this.addSus(targetId, strength * cred * (0.6 + this.diff.observe * 0.4));
+  }
+
+  // Resposta a uma pergunta feita no chat livre ("Bruno, onde você estava?").
+  answerQuestion(st, asker) {
+    const { g, p } = this;
+    let where = st.body ? this.roomAt(st.body.time) : p.lastRoomId;
+    if (p.isImpostor && st.body && where === st.body.room) {
+      const others = g.map.rooms.filter((r) => !r.corridor && r.id !== st.body.room);
+      where = pick(others).id;
+    }
+    const buddy = g.players.filter((q) => q.alive && q !== p && q !== asker).sort((a, b) => (this.together[b.id] || 0) - (this.together[a.id] || 0))[0];
+    const extra = buddy && (this.together[buddy.id] || 0) > 4 ? ` ${buddy.name} pode confirmar.` : '';
+    return pick([`${asker.name}, eu estava ${g.roomPhrase(where)}.${extra}`, `Tava ${g.roomPhrase(where)} fazendo tarefa, ${asker.name}.${extra}`]);
   }
 
   voteTime(st) {
@@ -520,6 +561,7 @@ export class BotBrain {
       for (const [voter, target] of Object.entries(st.votes)) if (Number(target) === ej.id) this.addSus(Number(voter), 8);
     }
     this.witness = this.witness.filter((w) => g.playerById(w.who).alive);
+    for (const id of Object.keys(this.cleared)) if (!g.playerById(id).alive) delete this.cleared[id];
     this.pending = null;
     this.clearGoal();
     this.idleUntil = g.time + rand(0.5, 2);

@@ -1,6 +1,7 @@
 // HUD durante a partida: barra de tarefas, lista, minimapa, botões de ação e avisos.
 import { SABOTAGES } from '../core/sabotage.js';
 import { RANDOM_EVENTS } from '../core/events.js';
+import { ICONS } from './icons.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -10,6 +11,7 @@ export function toast(text, kind = '', ms = 3200) {
   t.className = `toast ${kind}`;
   t.textContent = text;
   box.appendChild(t);
+  while (box.children.length > 4) box.firstChild.remove();
   setTimeout(() => t.classList.add('out'), ms);
   setTimeout(() => t.remove(), ms + 400);
 }
@@ -20,8 +22,8 @@ export class Hud {
     this.onAction = onAction;
     this.game = null;
     this.lastRoom = null;
-    this.roomTimer = 0;
     this.taskSig = '';
+    this.root.querySelectorAll('[data-icon]').forEach((s) => { s.innerHTML = ICONS[s.dataset.icon] || ''; });
     this.root.querySelectorAll('[data-action]').forEach((b) => {
       b.addEventListener('click', (e) => { e.stopPropagation(); this.onAction(b.dataset.action); });
     });
@@ -48,18 +50,21 @@ export class Hud {
       const mates = game.players.filter((p) => p.isImpostor && p !== me).map((p) => p.name);
       chip.title = mates.length ? `Parceiros: ${mates.join(', ')}` : 'Você é o único impostor';
     } else chip.title = '';
-    this.buttons.sabotage.style.display = me.isImpostor ? '' : 'none';
-    this.buttons.vent.style.display = me.isImpostor ? '' : 'none';
-    this.buttons.kill.style.display = me.isImpostor ? '' : 'none';
-    this.buttons.report.style.display = '';
+    for (const k of ['sabotage', 'vent', 'kill']) this.buttons[k].style.display = me.isImpostor ? '' : 'none';
     $('.ghost-note', this.root).classList.add('hidden');
-    const small = window.innerWidth < 640;
-    $('.tasklist', this.root).classList.toggle('collapsed', small);
+    $('.tasklist', this.root).classList.toggle('collapsed', window.innerWidth < 640);
+    this.netState(null);
     this.show();
   }
 
   show() { this.root.classList.remove('hidden'); }
   hide() { this.root.classList.add('hidden'); }
+
+  netState(text) {
+    const el = $('.net-badge', this.root);
+    el.textContent = text || '';
+    el.classList.toggle('hidden', !text);
+  }
 
   showRoom(name) {
     const el = $('.room-toast', this.root);
@@ -80,12 +85,10 @@ export class Hud {
     if (!g) return;
     const me = g.local;
 
-    // Barra de progresso coletiva
     const { done, total } = g.taskProgress();
     $('.taskbar-track i', this.root).style.width = `${total ? (done / total) * 100 : 0}%`;
     $('.taskbar', this.root).style.display = g.tutorial ? 'none' : '';
 
-    // Lista de tarefas
     const sig = me.tasks.map((t) => `${t.stationId}:${t.done}`).join('|') + (g.sabotage.machinesDown ? 'M' : '');
     if (sig !== this.taskSig) {
       this.taskSig = sig;
@@ -102,12 +105,11 @@ export class Hud {
         const li = document.createElement('li');
         const blocked = g.sabotage.isStationBlocked(s);
         li.className = t.done ? 'done' : blocked ? 'blocked' : '';
-        li.innerHTML = `<b>${g.roomName(s.room)}:</b> ${s.name}${s.long ? ' <em>(longa)</em>' : ''}`;
+        li.innerHTML = `<b>${g.roomName(s.room)}:</b> ${s.name}${s.visual && g.settings.visualTasks ? ' <em>(visual)</em>' : s.long ? ' <em>(longa)</em>' : ''}`;
         ul.appendChild(li);
       }
     }
 
-    // Nome da sala atual
     const room = g.roomAtPos(me.x, me.y);
     const rid = room?.id || null;
     if (rid !== this.lastRoom) {
@@ -115,42 +117,50 @@ export class Hud {
       if (room) this.showRoom(room.name);
     }
 
-    // Faixa de sabotagem
     const sab = g.sabotage.active;
     const banner = $('.sab-banner', this.root);
-    if (sab) {
+    if (sab && SABOTAGES[sab.type]) {
       const def = SABOTAGES[sab.type];
-      const parts = Object.entries(sab.fixed).map(([id, ok]) => `${ok ? '✔' : '✖'} ${g.map.fixById[id].name}`).join(' · ');
-      banner.innerHTML = `<b>${def.critical ? '🚨' : '⚠️'} ${def.name}${def.critical ? ` — ${Math.ceil(sab.remaining)}s` : ''}</b><span>${me.isImpostor ? 'Sabotagem em andamento.' : def.alert}</span><small>${parts}</small>`;
+      const parts = Object.entries(sab.fixed || {}).map(([id, ok]) => `${ok ? '✔' : '✖'} ${g.map.fixById[id]?.name || id}`).join(' · ');
+      banner.innerHTML = `<b>${def.name}${def.critical ? ` — ${Math.ceil(sab.remaining)}s` : ''}</b><span>${me.isImpostor ? 'Sabotagem em andamento.' : def.alert}</span><small>${parts}</small>`;
       banner.className = `sab-banner ${def.critical ? 'critical' : ''}`;
     } else banner.className = 'sab-banner hidden';
 
-    // Evento aleatório
     const ev = g.events.active;
     const evb = $('.event-banner', this.root);
-    if (ev) { const d = RANDOM_EVENTS[ev.id]; evb.innerHTML = `<b>${d.name}</b> ${d.desc} <i>${Math.ceil(ev.remaining)}s</i>`; evb.className = 'event-banner'; }
+    if (ev && RANDOM_EVENTS[ev.id]) { const d = RANDOM_EVENTS[ev.id]; evb.innerHTML = `<b>${d.name}</b> ${d.desc} <i>${Math.ceil(ev.remaining)}s</i>`; evb.className = 'event-banner'; }
     else evb.className = 'event-banner hidden';
 
-    // Botões de ação e dica contextual
     const it = g.interactionsFor(me);
     this.interactions = it;
     const b = this.buttons;
     b.use.disabled = !it.use || it.use.disabled || it.use.kind === 'blocked';
-    b.use.querySelector('.lbl').textContent = it.use?.kind === 'emergency' ? 'REUNIÃO' : it.use?.kind === 'cameras' ? 'CÂMERAS' : it.use?.kind === 'fix' ? 'CONSERTAR' : 'USAR';
+    const useLabels = { emergency: 'REUNIÃO', cameras: 'CÂMERAS', admin: 'ADMIN', fix: 'CONSERTAR' };
+    const useIcons = { emergency: 'bell', cameras: 'cameras', admin: 'admin', fix: 'fix' };
+    const kind = it.use?.kind;
+    b.use.querySelector('.lbl').textContent = useLabels[kind] || 'USAR';
+    const ui = useIcons[kind] || 'use';
+    if (b.use.dataset.ico !== ui) { b.use.dataset.ico = ui; b.use.querySelector('.ico').innerHTML = ICONS[ui]; }
     b.report.disabled = !it.report;
     if (me.isImpostor) {
       b.kill.disabled = !it.kill;
-      b.kill.querySelector('.cd').textContent = me.alive && me.killCooldown > 0 ? Math.ceil(me.killCooldown) : '';
+      b.kill.querySelector('.cd').textContent = me.alive && me.killCooldown > 0 && !me.inVent ? Math.ceil(me.killCooldown) : '';
       b.kill.style.display = me.alive ? '' : 'none';
-      b.vent.disabled = !it.vent;
+      const inVent = !!me.inVent;
+      b.vent.disabled = !(inVent || it.vent);
+      b.vent.classList.toggle('invent', inVent);
+      b.vent.querySelector('.lbl').textContent = inVent ? 'SAIR' : 'DUTO';
+      const vi = inVent ? 'exit' : 'vent';
+      if (b.vent.dataset.ico !== vi) { b.vent.dataset.ico = vi; b.vent.querySelector('.ico').innerHTML = ICONS[vi]; }
       b.vent.style.display = me.alive ? '' : 'none';
       const sabCd = g.sabotage.cooldown;
-      b.sabotage.querySelector('.cd').textContent = sabCd > 0 ? Math.ceil(sabCd) : '';
+      b.sabotage.querySelector('.cd').textContent = sabCd > 0 && !g.sabotage.active ? Math.ceil(sabCd) : '';
     }
 
     const prompt = $('.prompt', this.root);
     let text = '';
-    if (me.busy?.kind === 'fake') text = `Fingindo tarefa... ${Math.round((me.busy.t / me.busy.dur) * 100)}%`;
+    if (me.inVent) text = 'Escondido no duto: clique nas setas (ou W A S D) para trocar de saída, <kbd>V</kbd> para sair';
+    else if (me.busy?.kind === 'fake') text = `Fingindo tarefa... ${Math.round((me.busy.t / me.busy.dur) * 100)}%`;
     else if (it.report) text = '<kbd>R</kbd> Reportar aluno desacordado';
     else if (it.kill) text = `<kbd>Q</kbd> Eliminar ${it.kill.name}`;
     else if (it.use) text = it.use.disabled ? it.use.label : `<kbd>E</kbd> ${it.use.label}`;
@@ -158,8 +168,6 @@ export class Hud {
     prompt.innerHTML = text;
     prompt.classList.toggle('hidden', !text);
 
-    // Minimapa
-    const mm = $('.minimap', this.root);
-    this.renderer.drawMap(mm);
+    this.renderer.drawMap($('.minimap', this.root));
   }
 }

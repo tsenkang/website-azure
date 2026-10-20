@@ -12,7 +12,9 @@ export class Tutorial {
     this.moved = 0;
     this.mapWasOpen = false;
     this.startPos = { x: game.local.x, y: game.local.y };
-    game.bodies.push({ id: 'dummy', dummy: true, x: 56.5 * T, y: 29.5 * T, time: 0, room: 'patio' });
+    const d = game.map.tutorial.dummy;
+    this.dummy = { px: d.x * T, py: d.y * T };
+    game.bodies.push({ id: 'dummy', dummy: true, x: this.dummy.px, y: this.dummy.py, time: 0, room: 'patio' });
     this.panel = document.createElement('div');
     this.panel.className = 'tutorial-panel';
     document.getElementById('screens').appendChild(this.panel);
@@ -23,7 +25,7 @@ export class Tutorial {
       { text: 'Tarefas aparecem com um <b>!</b> amarelo. Chegue perto da mesa do professor e aperte <kbd>E</kbd> para fazer a <b>prova surpresa</b>.', target: () => this.game.map.stationById.aula_prova, done: () => this.game.local.tasks.find((t) => t.stationId === 'aula_prova').done },
       { text: 'Mandou bem! Abra o mapa com <kbd>M</kbd> (ou clique no minimapa) para ver onde estão suas tarefas. Depois feche com <kbd>M</kbd>.', done: () => { if (this.isMapOpen()) this.mapWasOpen = true; return this.mapWasOpen && !this.isMapOpen(); } },
       { text: 'Vá ao <b>Pátio</b> e monte o lanche da cantina (tarefa com <b>!</b>). A barra de tarefas da turma enche quando todos colaboram.', target: () => this.game.map.stationById.cantina_lanche, done: () => this.game.local.tasks.find((t) => t.stationId === 'cantina_lanche').done },
-      { text: 'Tem um <b>boneco de primeiros socorros</b> caído no Pátio. Chegue perto e aperte <kbd>R</kbd> para reportar a ocorrência.', target: () => ({ px: 56.5 * T, py: 29.5 * T }), done: () => false },
+      { text: 'Tem um <b>boneco de primeiros socorros</b> caído no Pátio. Chegue perto e aperte <kbd>R</kbd> para reportar a ocorrência.', target: () => this.dummy, done: () => false },
     ];
     this.render();
   }

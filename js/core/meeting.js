@@ -1,4 +1,5 @@
 // Reuniões, discussão e votação (lógica pura; a UI apenas observa este estado).
+import { sanitizeChat, parseChat } from './chat.js';
 export class MeetingSystem {
   constructor(game) {
     this.game = game;
@@ -46,6 +47,7 @@ export class MeetingSystem {
     const st = this.state;
     if (!st || !speaker.alive || st.phase === 'results' || st.phase === 'eject') return;
     st.chat.push({ id: speaker.id, name: speaker.name, text, t: st.t });
+    if (st.chat.length > 200) st.chat.shift();
     if (effect && effect.target != null) {
       st.accusations[effect.target] = (st.accusations[effect.target] || 0) + effect.strength;
       for (const p of this.game.players) {
@@ -55,11 +57,31 @@ export class MeetingSystem {
     this.game.emit('chat', { speaker, text });
   }
 
-  // Falas rápidas do jogador humano (afetam a desconfiança dos bots).
-  humanSay(kind, targetId) {
+  // Chat livre de um jogador humano. Os bots leem acusações, defesas e perguntas simples.
+  chat(speaker, rawText) {
     const st = this.state;
-    const me = this.game.local;
-    if (!st || !me.alive) return;
+    if (!st || !speaker.alive || speaker.isBot) return false;
+    const text = sanitizeChat(rawText);
+    if (!text) return false;
+    const now = st.t;
+    const sent = (st.sent ||= {});
+    const mine = (sent[speaker.id] ||= { last: -9, count: 0 });
+    if (now - mine.last < 1 || mine.count >= 25) return false;
+    mine.last = now; mine.count++;
+    const { effect, question } = parseChat(this.game, speaker, text);
+    this.say(speaker, text, effect);
+    if (question && question.alive && question.brain) {
+      st.scheduled.push({ delay: st.t + 1.2 + Math.random() * 1.5, text: question.brain.answerQuestion(st, speaker), speaker: question });
+      st.scheduled.sort((a, b) => a.delay - b.delay);
+    }
+    return true;
+  }
+
+  // Falas rápidas (atalhos de chat).
+  humanSay(kind, targetId, speaker = this.game.local) {
+    const st = this.state;
+    const me = speaker;
+    if (!st || !me || !me.alive) return;
     const target = targetId != null ? this.game.playerById(targetId) : null;
     const lastRoom = this.game.roomName(me.lastRoomId);
     switch (kind) {

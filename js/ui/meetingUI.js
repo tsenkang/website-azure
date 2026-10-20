@@ -1,30 +1,34 @@
-// Interface da reunião: discussão, falas rápidas, votação, resultado e expulsão.
+// Interface da reunião: chat livre, atalhos de fala, votação, resultado e expulsão.
 import { drawAvatar } from '../render/sprites.js';
 import { audio } from '../audio.js';
+import { icon } from './icons.js';
+import { CHAT_MAX } from '../core/chat.js';
+
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export class MeetingUI {
   constructor() {
     this.el = null;
     this.game = null;
     this.selected = null;
-    this.chatCount = 0;
-    this.lastSay = 0;
+    this.actions = null;
   }
 
-  open(game, st) {
+  // actions: { vote(target), chat(text), quick(kind, targetId) }
+  open(game, st, actions) {
     this.game = game;
+    this.actions = actions;
     this.selected = null;
-    this.chatCount = 0;
     const me = game.local;
     const reasonText = st.kind === 'report'
-      ? `${st.caller.name} encontrou ${st.victim.name} desacordado(a) ${game.roomPhrase(st.body.room)}.`
-      : `${st.caller.name} apertou o sinal de emergência.`;
+      ? `${esc(st.caller.name)} encontrou ${esc(st.victim?.name || 'alguém')} desacordado(a) ${game.roomPhrase(st.room)}.`
+      : `${esc(st.caller.name)} apertou o sinal de emergência.`;
     const el = document.createElement('div');
     el.className = 'meeting';
     el.innerHTML = `
       <div class="meeting-panel">
         <header>
-          <div class="m-title"><span class="m-icon">${st.kind === 'report' ? '📢' : '🔔'}</span>
+          <div class="m-title"><span class="m-icon">${icon(st.kind === 'report' ? 'report' : 'bell')}</span>
             <div><h2>${st.kind === 'report' ? 'OCORRÊNCIA REPORTADA' : 'REUNIÃO DE EMERGÊNCIA'}</h2><p>${reasonText}</p></div></div>
           <div class="m-timer"><small class="m-phase">Discussão</small><b>--</b></div>
         </header>
@@ -32,16 +36,14 @@ export class MeetingUI {
           <div class="m-players"></div>
           <aside class="m-chat">
             <div class="m-log" aria-live="polite"></div>
-            <div class="m-quick ${me.alive ? '' : 'hidden'}">
-              <div class="row"><button data-say="where">📍 Onde eu estava</button><button data-say="notme">🙅 Não fui eu</button><button data-say="skip">⏭ Sem provas</button></div>
-              <div class="row target"><select aria-label="Jogador"></select>
-                <button data-say="sus">🤨 Suspeito</button><button data-say="saw">👀 Vi perto do corpo</button><button data-say="trust">🤝 Confiável</button></div>
-            </div>
-            <p class="m-dead ${me.alive ? 'hidden' : ''}">Você está desacordado(a) e só pode assistir à reunião.</p>
+            ${me.alive ? `
+            <form class="m-input"><input type="text" id="chatbox" maxlength="${CHAT_MAX}" placeholder="Escreva no chat... (Enter)" autocomplete="off" aria-label="Mensagem"><button type="submit" aria-label="Enviar">${icon('send')}</button></form>
+            <div class="m-quick"><button data-say="where">Onde eu estava</button><button data-say="notme">Não fui eu</button><button data-say="skip">Sem provas</button></div>`
+    : '<p class="m-dead">Você está desacordado(a) e só pode assistir à reunião.</p>'}
           </aside>
         </div>
         <footer>
-          <button class="btn skip-vote" ${me.alive ? '' : 'disabled'}>⏭ Pular votação</button>
+          <button class="btn skip-vote" ${me.alive ? '' : 'disabled'}>Pular votação</button>
           <div class="skip-chips"></div>
           <div class="confirm hidden"><span></span><button class="btn primary yes">Confirmar voto</button><button class="btn no">Cancelar</button></div>
         </footer>
@@ -55,50 +57,62 @@ export class MeetingUI {
       const card = document.createElement('button');
       card.className = 'm-card';
       card.dataset.id = p.id;
-      card.innerHTML = `<canvas></canvas><div class="info"><b>${p.name}${p === me ? ' (você)' : ''}</b><small>${p.isBot ? 'BOT' : 'JOGADOR'}${me.isImpostor && p.isImpostor ? ' · <span class="imp">IMPOSTOR</span>' : ''}</small></div><span class="flag"></span><div class="chips"></div>`;
+      card.innerHTML = `<canvas></canvas><div class="info"><b>${esc(p.name)}${p === me ? ' (você)' : ''}</b><small>${p.isBot ? 'BOT' : 'JOGADOR'}${me.isImpostor && p.isImpostor ? ' · <span class="imp">IMPOSTOR</span>' : ''}</small></div><span class="flag"></span><div class="chips"></div>`;
       grid.appendChild(card);
       card.addEventListener('click', () => this.select(p));
     }
-    const select = el.querySelector('select');
-    for (const p of game.players) if (p.alive && p !== me) select.add(new Option(p.name, p.id));
-    el.querySelectorAll('[data-say]').forEach((b) => b.addEventListener('click', () => {
-      if (performance.now() - this.lastSay < 1500) return;
-      this.lastSay = performance.now();
-      game.meeting.humanSay(b.dataset.say, Number(select.value));
-      audio.click();
-    }));
+    for (const c of st.chat) this.addChat({ speaker: game.playerById(c.id), text: c.text });
+
+    const form = el.querySelector('.m-input');
+    if (form) {
+      const input = form.querySelector('input');
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+        this.actions.chat(text);
+        input.value = '';
+        audio.click();
+      });
+      // Enter em qualquer lugar foca o chat.
+      this.keyHandler = (e) => { if (e.key === 'Enter' && document.activeElement !== input) { e.preventDefault(); input.focus(); } };
+      window.addEventListener('keydown', this.keyHandler);
+    }
+    el.querySelectorAll('[data-say]').forEach((b) => b.addEventListener('click', () => { this.actions.quick(b.dataset.say, null); audio.click(); }));
     el.querySelector('.skip-vote').addEventListener('click', () => this.select('skip'));
     el.querySelector('.confirm .no').addEventListener('click', () => { this.selected = null; this.refresh(); });
     el.querySelector('.confirm .yes').addEventListener('click', () => {
       if (this.selected == null) return;
-      if (game.meeting.castVote(me, this.selected === 'skip' ? 'skip' : this.selected.id)) audio.vote();
+      this.actions.vote(this.selected === 'skip' ? 'skip' : this.selected.id);
+      audio.vote();
+      this.voted = true;
       this.selected = null;
       this.refresh();
     });
+    this.voted = false;
     this.refresh();
   }
 
   select(target) {
     const g = this.game, st = g.meeting.state;
-    if (!st || st.phase !== 'voting' || !g.local.alive || g.local.id in st.votes) return;
+    if (!st || st.phase !== 'voting' || !g.local.alive || this.voted || g.local.id in st.votes) return;
     if (target !== 'skip' && !target.alive) return;
     this.selected = target;
     audio.click();
     this.refresh();
   }
 
-  addChat(msg) {
-    if (!this.el) return;
+  addChat({ speaker, text }) {
+    if (!this.el || !speaker) return;
     const log = this.el.querySelector('.m-log');
-    const p = this.game.playerById(msg.speaker.id);
     const row = document.createElement('div');
-    row.className = `m-msg ${p === this.game.local ? 'mine' : ''}`;
-    row.innerHTML = `<canvas></canvas><div><b style="color:${p.color.hex}">${p.name}${p.isBot ? ' <i>BOT</i>' : ''}</b><p></p></div>`;
-    row.querySelector('p').textContent = msg.text;
+    row.className = `m-msg ${speaker === this.game.local ? 'mine' : ''}`;
+    row.innerHTML = `<canvas></canvas><div><b style="color:${speaker.color.dark}">${esc(speaker.name)}${speaker.isBot ? ' <i>BOT</i>' : ''}</b><p></p></div>`;
+    row.querySelector('p').textContent = text;
     log.appendChild(row);
-    drawAvatar(row.querySelector('canvas'), p.look, { scale: 0.85 });
+    drawAvatar(row.querySelector('canvas'), speaker.look, { scale: 0.85 });
     log.scrollTop = log.scrollHeight;
-    if (p !== this.game.local) audio.tone(500 + Math.random() * 200, 0.05, { type: 'triangle', vol: 0.06 });
+    if (speaker !== this.game.local) audio.tone(500 + Math.random() * 200, 0.05, { type: 'triangle', vol: 0.06 });
   }
 
   refresh() {
@@ -107,10 +121,11 @@ export class MeetingUI {
     const me = g.local;
     const phaseEl = this.el.querySelector('.m-phase');
     const timer = this.el.querySelector('.m-timer b');
-    if (st.phase === 'discussion') { phaseEl.textContent = 'Discussão (votação em breve)'; timer.textContent = Math.ceil(st.discussionEnd - st.t); }
+    if (st.phase === 'discussion') { phaseEl.textContent = 'Discussão (votação em breve)'; timer.textContent = Math.max(0, Math.ceil(st.discussionEnd - st.t)); }
     else if (st.phase === 'voting') { phaseEl.textContent = 'Votação'; timer.textContent = Math.max(0, Math.ceil(st.votingEnd - st.t)); }
     else { phaseEl.textContent = 'Resultado'; timer.textContent = '✔'; }
     this.el.classList.toggle('voting', st.phase === 'voting');
+    const iVoted = this.voted || me.id in st.votes;
 
     for (const card of this.el.querySelectorAll('.m-card')) {
       const p = g.playerById(card.dataset.id);
@@ -118,9 +133,9 @@ export class MeetingUI {
       card.classList.toggle('dead', !p.alive);
       card.classList.toggle('selected', this.selected !== 'skip' && this.selected?.id === p.id);
       card.classList.toggle('caller', st.caller === p);
-      card.disabled = st.phase !== 'voting' || !p.alive || !me.alive || me.id in st.votes;
+      card.disabled = st.phase !== 'voting' || !p.alive || !me.alive || iVoted;
       const flag = card.querySelector('.flag');
-      flag.textContent = !p.alive ? '💤' : st.phase === 'results' || st.phase === 'eject' ? '' : voted ? '✔ votou' : st.caller === p ? '📢' : '';
+      flag.textContent = !p.alive ? 'fora' : st.phase === 'results' || st.phase === 'eject' ? '' : voted ? 'votou ✔' : '';
       if (!card.dataset.drawn || card.dataset.alive !== String(p.alive)) {
         drawAvatar(card.querySelector('canvas'), p.look, { dead: !p.alive, scale: 1 });
         card.dataset.drawn = '1'; card.dataset.alive = String(p.alive);
@@ -131,8 +146,7 @@ export class MeetingUI {
       confirm.classList.remove('hidden');
       confirm.querySelector('span').textContent = this.selected === 'skip' ? 'Pular a votação?' : `Votar em ${this.selected.name}?`;
     } else confirm.classList.add('hidden');
-    const skipBtn = this.el.querySelector('.skip-vote');
-    skipBtn.disabled = st.phase !== 'voting' || !me.alive || me.id in st.votes;
+    this.el.querySelector('.skip-vote').disabled = st.phase !== 'voting' || !me.alive || iVoted;
   }
 
   showResults(result) {
@@ -146,14 +160,14 @@ export class MeetingUI {
       return c;
     };
     let delay = 0;
-    for (const [voter, target] of Object.entries(result.votes)) {
+    for (const [voter, target] of Object.entries(result.votes || {})) {
       setTimeout(() => {
         if (!this.el) return;
         const box = target === 'skip' ? this.el.querySelector('.skip-chips') : this.el.querySelector(`.m-card[data-id="${target}"] .chips`);
         box?.appendChild(chip(voter));
         audio.tone(600, 0.05, { type: 'triangle', vol: 0.08 });
       }, delay);
-      delay += 180;
+      delay += 160;
     }
     this.el.querySelector('.skip-chips').insertAdjacentHTML('afterbegin', '<small>Pularam:</small>');
     this.selected = null;
@@ -171,7 +185,7 @@ export class MeetingUI {
     else {
       line1 = `${ej.name} foi encaminhado(a) à coordenação.`;
       if (g.settings.revealRoles) {
-        const left = g.players.filter((p) => p.alive && p.isImpostor && p !== ej).length;
+        const left = result.impostorsLeft != null ? result.impostorsLeft : g.players.filter((p) => p.alive && p.isImpostor && p !== ej).length;
         line2 = `${ej.name} ${ej.isImpostor ? 'ERA' : 'NÃO era'} um impostor. ${left} impostor${left === 1 ? '' : 'es'} restante${left === 1 ? '' : 's'}.`;
       }
     }
@@ -199,6 +213,8 @@ export class MeetingUI {
   }
 
   close() {
+    if (this.keyHandler) window.removeEventListener('keydown', this.keyHandler);
+    this.keyHandler = null;
     if (this.el) this.el.remove();
     this.el = null;
   }

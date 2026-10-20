@@ -1,0 +1,13 @@
+# Blueprint do Render.com: um único Web Service que serve o jogo e as partidas online.
+services:
+  - type: web
+    name: senai-suspeitos
+    runtime: node
+    plan: free
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"

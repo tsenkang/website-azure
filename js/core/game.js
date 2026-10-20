@@ -1,10 +1,11 @@
 // Estado central da partida. Não depende do DOM: roda no navegador ou no Node.
+// Modos: 'local' (single-player com bots), 'server' (autoridade online) e 'mirror' (cópia no cliente online).
 import {
   TILE as T, PLAYER_RADIUS, BASE_SPEED, VISION, KILL_RANGE, REPORT_RANGE, USE_RANGE, VENT_RANGE,
   EMERGENCY_RANGE, PLAYER_COLORS, BOT_NAMES, DIFFICULTY, DEFAULT_SETTINGS,
 } from '../config.js';
 import { buildMap, roomAt } from './map.js';
-import { moveEntity, lineOfSight } from './physics.js';
+import { moveEntity, lineOfSight, collides } from './physics.js';
 import { Player, randomLook, resetPlayerIds } from './player.js';
 import { SabotageSystem } from './sabotage.js';
 import { MeetingSystem } from './meeting.js';
@@ -18,11 +19,14 @@ const shuffle = (arr) => {
 };
 
 export class Game {
-  constructor({ settings = {}, human = { name: 'Você', look: randomLook('azul') }, tutorial = false, allBots = false, bots = null } = {}) {
+  constructor({
+    settings = {}, human = null, humans = null, localIndex = 0, tutorial = false, allBots = false, bots = null, mode = 'local',
+  } = {}) {
     this.settings = { ...DEFAULT_SETTINGS, ...settings };
     this.diff = DIFFICULTY[this.settings.difficulty] || DIFFICULTY.normal;
+    this.mode = mode;
     this.tutorial = tutorial;
-    this.map = buildMap();
+    this.map = buildMap(this.settings.map);
     this.listeners = {};
     this.time = 0;
     this.phase = 'play';
@@ -36,32 +40,41 @@ export class Game {
 
     resetPlayerIds();
     this.players = [];
-    const local = new Player({ name: human.name || 'Você', look: { ...human.look }, isBot: allBots });
-    local.isLocal = true;
-    this.players.push(local);
-    this.local = local;
+    const humanList = humans || [human || { name: 'Você', look: randomLook('azul') }];
+    for (const h of humanList) {
+      const p = new Player({ name: h.name || 'Aluno', look: { ...h.look }, isBot: allBots });
+      p.human = !allBots;
+      p.clientId = h.clientId || null;
+      this.players.push(p);
+    }
+    this.local = mode === 'server' ? null : this.players[localIndex] || this.players[0];
+    if (this.local) this.local.isLocal = true;
 
-    const total = tutorial ? 1 : Math.max(4, Math.min(10, this.settings.players));
-    const colors = shuffle(PLAYER_COLORS.filter((c) => c.id !== local.look.color));
-    const names = shuffle(BOT_NAMES);
-    for (let i = 1; i < total; i++) {
-      const preset = bots && bots[i - 1];
-      this.players.push(new Player({ name: preset ? preset.name : names[i - 1], look: preset ? { ...preset.look } : randomLook(colors[i - 1].id), isBot: true }));
+    const total = tutorial ? humanList.length : Math.max(humanList.length, Math.max(4, Math.min(10, this.settings.players)));
+    const used = new Set(this.players.map((p) => p.look.color));
+    const colors = shuffle(PLAYER_COLORS.filter((c) => !used.has(c.id)));
+    const names = shuffle(BOT_NAMES.filter((n) => !this.players.some((p) => p.name === n)));
+    for (let i = this.players.length, b = 0; i < total; i++, b++) {
+      const preset = bots && bots[b];
+      const look = preset ? { ...preset.look } : randomLook((colors[b] || PLAYER_COLORS[b % PLAYER_COLORS.length]).id);
+      this.players.push(new Player({ name: preset ? preset.name : names[b], look, isBot: true }));
     }
 
     this.sabotage = new SabotageSystem(this);
     this.meeting = new MeetingSystem(this);
     this.events = new RandomEvents(this);
 
-    this.assignRoles();
-    this.assignTasks();
+    if (mode !== 'mirror') {
+      this.assignRoles();
+      this.assignTasks();
+    }
     this.placeAtSpawn();
     for (const p of this.players) {
       p.killCooldown = 20;
       p.lastRoomId = this.roomAtPos(p.x, p.y)?.id;
-      if (p.isBot) p.brain = new BotBrain(this, p);
+      if (p.isBot && mode !== 'mirror') p.brain = new BotBrain(this, p);
     }
-    this.addLog('A aula começou! Os alunos entraram na escola.', 'start');
+    this.addLog(`A aula começou! (${this.map.name})`, 'start');
   }
 
   // ---------- eventos ----------
@@ -78,6 +91,7 @@ export class Game {
   get impostors() { return this.players.filter((p) => p.isImpostor); }
 
   taskProgress() {
+    if (this.netProgress) return this.netProgress;
     let done = 0, total = 0;
     for (const p of this.players) {
       if (p.isImpostor) continue;
@@ -99,9 +113,19 @@ export class Game {
   }
 
   canSee(viewer, target) {
+    if (target.inVent && target !== viewer) return false;
     const d = Math.hypot(target.x - viewer.x, target.y - viewer.y);
     if (d > this.visionOf(viewer)) return false;
     return lineOfSight(this.map, viewer.x, viewer.y, target.x, target.y);
+  }
+
+  // Tarefa visual em andamento: os outros veem a animação, e isso prova que a pessoa é aluno.
+  visualTaskOf(p) {
+    if (!this.settings.visualTasks || !p.alive || p.isImpostor || !p.busy) return null;
+    const id = p.busy.stationId;
+    if (!id || (p.busy.kind !== 'task' && p.busy.kind !== 'minigame')) return null;
+    const s = this.map.stationById[id];
+    return s?.visual ? s : null;
   }
 
   // ---------- configuração inicial ----------
@@ -112,8 +136,10 @@ export class Game {
     const impCount = Math.max(1, Math.min(this.settings.impostors, maxImp));
     let pool = shuffle(this.players);
     const pref = this.settings.rolePref;
-    if (pref === 'impostor') pool = [this.local, ...pool.filter((p) => p !== this.local)];
-    if (pref === 'aluno') pool = [...pool.filter((p) => p !== this.local), this.local];
+    if (this.mode === 'local' && this.local) {
+      if (pref === 'impostor') pool = [this.local, ...pool.filter((p) => p !== this.local)];
+      if (pref === 'aluno') pool = [...pool.filter((p) => p !== this.local), this.local];
+    }
     pool.slice(0, impCount).forEach((p) => { p.role = 'impostor'; });
     this.addLog(`Impostores: ${this.impostors.map((p) => p.name).join(', ')}`, 'roles', true);
   }
@@ -121,12 +147,13 @@ export class Game {
   assignTasks() {
     const st = this.map.stations;
     if (this.tutorial) {
-      this.local.tasks = ['aula_prova', 'cantina_lanche'].map((id) => ({ stationId: id, done: false }));
+      const ids = this.map.tutorial?.tasks || st.slice(0, 2).map((s) => s.id);
+      for (const p of this.players) p.tasks = ids.map((id) => ({ stationId: id, done: false }));
       return;
     }
     const count = Math.max(2, Math.min(8, this.settings.tasksPerPlayer));
     for (const p of this.players) {
-      // Garante variedade de salas: no máximo uma tarefa por sala sempre que possível.
+      // Variedade de salas: no máximo uma tarefa por sala sempre que possível.
       const byRoom = {};
       for (const s of shuffle(st)) (byRoom[s.room] ||= []).push(s);
       const rooms = shuffle(Object.keys(byRoom));
@@ -150,16 +177,17 @@ export class Game {
       const a = (i / n) * Math.PI * 2;
       p.x = this.map.spawn.px + Math.cos(a) * 1.6 * T;
       p.y = this.map.spawn.py + Math.sin(a) * 1.2 * T;
+      p.netX = p.x; p.netY = p.y;
     });
   }
 
   placeAroundTable() {
-    const alive = this.players;
-    const n = alive.length;
-    alive.forEach((p, i) => {
+    const n = this.players.length;
+    this.players.forEach((p, i) => {
       const a = (i / n) * Math.PI * 2 - Math.PI / 2;
       p.x = this.map.emergency.px + Math.cos(a) * 2.4 * T;
       p.y = this.map.emergency.py + Math.sin(a) * 2.2 * T;
+      p.netX = p.x; p.netY = p.y;
       p.vx = p.vy = 0;
     });
   }
@@ -167,6 +195,7 @@ export class Game {
   // ---------- loop ----------
   update(dt) {
     if (this.paused || this.phase === 'ended') return;
+    if (this.mode === 'mirror') { this.updateMirror(dt); return; }
     if (this.phase === 'meeting') { this.meeting.update(dt); return; }
     this.time += dt;
     this.emergencyCooldown = Math.max(0, this.emergencyCooldown - dt);
@@ -178,19 +207,34 @@ export class Game {
       if (p.busy) this.updateBusy(p, dt);
     }
 
-    this.moveLocal(dt);
+    if (this.mode === 'local' && this.local && !this.local.isBot) this.movePlayer(this.local, this.input.x, this.input.y, dt);
     for (const p of this.players) if (p.isBot && this.phase === 'play') p.brain.update(dt);
     for (const p of this.players) {
       p.animT += dt;
       const r = this.roomAtPos(p.x, p.y);
       if (r && !r.corridor) p.lastRoomId = r.id;
-      else if (r) p.lastCorridorId = r.id;
     }
 
     this.sabotage.update(dt);
     if (this.phase !== 'play') return;
     this.events.update(dt);
     this.checkWin();
+  }
+
+  // Cliente online: só move o jogador local (predição) e suaviza os demais.
+  updateMirror(dt) {
+    const me = this.local;
+    if (this.phase === 'play' && me) this.movePlayer(me, this.input.x, this.input.y, dt);
+    const k = 1 - Math.pow(0.0005, dt);
+    for (const p of this.players) {
+      p.animT += dt;
+      if (p === me) continue;
+      if (p.netX == null) continue;
+      const dx = p.netX - p.x, dy = p.netY - p.y;
+      if (Math.hypot(dx, dy) > 6 * T) { p.x = p.netX; p.y = p.netY; } else { p.x += dx * k; p.y += dy * k; }
+    }
+    if (this.meeting.state) { this.meeting.state.t += dt; this.meeting.state.phaseT += dt; }
+    if (this.sabotage.active) this.sabotage.active.remaining = Math.max(0, this.sabotage.active.remaining - dt);
   }
 
   speedFor(p) {
@@ -203,7 +247,7 @@ export class Game {
   // Move um jogador na direção (dx, dy) normalizada; usado pelo humano e pelos bots.
   movePlayer(p, dx, dy, dt) {
     const len = Math.hypot(dx, dy);
-    if (len < 0.01 || p.busy) { p.moving = false; p.vx = p.vy = 0; return; }
+    if (len < 0.01 || p.busy || p.inVent) { p.moving = false; p.vx = p.vy = 0; return; }
     const sp = this.speedFor(p);
     const vx = (dx / len) * sp, vy = (dy / len) * sp;
     const ox = p.x, oy = p.y;
@@ -213,10 +257,18 @@ export class Game {
     if (Math.abs(dx) > 0.2) p.facing = dx > 0 ? 1 : -1;
   }
 
-  moveLocal(dt) {
-    const p = this.local;
-    if (p.isBot) return;
-    this.movePlayer(p, this.input.x, this.input.y, dt);
+  // Servidor: aceita a posição enviada pelo cliente se for plausível (velocidade e colisão).
+  applyClientMove(p, x, y, facing, moving, dtSince) {
+    if (this.phase !== 'play' || p.busy || p.inVent) return false;
+    const maxD = this.speedFor(p) * Math.min(1, dtSince) * 1.6 + 24;
+    const d = Math.hypot(x - p.x, y - p.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || d > maxD) return false;
+    if (p.alive && collides(this.map, x, y, PLAYER_RADIUS - 3)) return false;
+    if (x < 0 || y < 0 || x > this.map.W * T || y > this.map.H * T) return false;
+    p.x = x; p.y = y;
+    p.facing = facing >= 0 ? 1 : -1;
+    p.moving = !!moving;
+    return true;
   }
 
   updateBusy(p, dt) {
@@ -254,7 +306,7 @@ export class Game {
   }
 
   killTargetFor(p) {
-    if (!p.alive || !p.isImpostor || p.killCooldown > 0 || this.phase !== 'play') return null;
+    if (!p.alive || !p.isImpostor || p.killCooldown > 0 || p.inVent || this.phase !== 'play') return null;
     let best = null, bd = KILL_RANGE;
     for (const q of this.players) {
       if (q === p || !q.alive || q.isImpostor) continue;
@@ -292,7 +344,7 @@ export class Game {
   }
 
   bodyNear(p) {
-    if (!p.alive || this.phase !== 'play') return null;
+    if (!p.alive || p.inVent || this.phase !== 'play') return null;
     let best = null, bd = REPORT_RANGE;
     for (const b of this.bodies) {
       const d = Math.hypot(b.x - p.x, b.y - p.y);
@@ -312,7 +364,7 @@ export class Game {
   }
 
   canCallEmergency(p) {
-    if (!p.alive || this.phase !== 'play' || p.emergencyUses <= 0 || this.tutorial) return false;
+    if (!p.alive || p.inVent || this.phase !== 'play' || p.emergencyUses <= 0 || this.tutorial) return false;
     if (this.emergencyCooldown > 0 || this.sabotage.critical) return false;
     return Math.hypot(p.x - this.map.emergency.px, p.y - this.map.emergency.py) <= EMERGENCY_RANGE;
   }
@@ -329,7 +381,8 @@ export class Game {
   beginMeeting(kind, caller, body) {
     this.phase = 'meeting';
     this.meetingsHeld++;
-    for (const p of this.players) { p.busy = null; p.moving = false; }
+    this.lastMeetingAt = this.time;
+    for (const p of this.players) { p.busy = null; p.moving = false; p.inVent = null; }
     this.sabotage.clearAll();
     this.events.clear();
     this.meeting.start(kind, caller, body);
@@ -353,30 +406,77 @@ export class Game {
     this.checkWin();
   }
 
+  // ---------- dutos de ventilação ----------
   ventNear(p) {
-    if (!p.isImpostor || !p.alive || this.phase !== 'play') return null;
+    if (!p.isImpostor || !p.alive || p.inVent || this.phase !== 'play') return null;
     return this.map.vents.find((v) => Math.hypot(v.px - p.x, v.py - p.y) <= VENT_RANGE) || null;
   }
 
-  useVent(p, targetId = null) {
-    const from = this.ventNear(p);
-    if (!from || p.ventCooldown > 0 || p.busy) return null;
-    const group = this.map.vents.filter((v) => v.group === from.group);
-    const to = targetId ? group.find((v) => v.id === targetId) : group[(group.indexOf(from) + 1) % group.length];
-    if (!to || to === from) return null;
-    const seenFrom = this.players.filter((q) => q.alive && q !== p && !q.isImpostor && this.canSee(q, p));
+  ventLinks(ventId) {
+    const v = this.map.ventById[ventId];
+    return v ? this.map.vents.filter((o) => o.group === v.group && o !== v) : [];
+  }
+
+  witnessesOf(p) {
+    return this.players.filter((q) => q.alive && q !== p && !q.isImpostor && this.canSee(q, p));
+  }
+
+  enterVent(p) {
+    const v = this.ventNear(p);
+    if (!v || p.ventCooldown > 0 || p.busy) return false;
+    const seen = this.witnessesOf(p);
+    p.x = v.px; p.y = v.py;
+    p.inVent = v.id;
+    p.moving = false;
+    p.ventCooldown = 0.2;
+    for (const q of seen) if (q.isBot) q.brain.onWitnessVent(p);
+    this.emit('ventEnter', { p, vent: v, witnesses: seen });
+    return true;
+  }
+
+  moveVent(p, toId) {
+    if (!p.inVent || p.ventCooldown > 0 || this.phase !== 'play') return false;
+    const to = this.ventLinks(p.inVent).find((v) => v.id === toId);
+    if (!to) return false;
+    const from = this.map.ventById[p.inVent];
+    p.inVent = to.id;
     p.x = to.px; p.y = to.py;
-    p.ventCooldown = 1.2;
-    const seenTo = this.players.filter((q) => q.alive && q !== p && !q.isImpostor && this.canSee(q, p));
-    for (const q of new Set([...seenFrom, ...seenTo])) if (q.isBot) q.brain.onWitnessVent(p);
-    this.emit('vent', { p, from, to, witnesses: [...seenFrom, ...seenTo] });
-    return to;
+    p.ventCooldown = 0.25;
+    this.emit('ventMove', { p, from, to });
+    return true;
+  }
+
+  exitVent(p) {
+    if (!p.inVent || p.ventCooldown > 0) return false;
+    const v = this.map.ventById[p.inVent];
+    p.inVent = null;
+    p.ventCooldown = 1;
+    const seen = this.witnessesOf(p);
+    for (const q of seen) if (q.isBot) q.brain.onWitnessVent(p);
+    this.emit('ventExit', { p, vent: v, witnesses: seen });
+    return true;
+  }
+
+  // Painel de admin: quantas pessoas há em cada sala (anônimo). Fica fora do ar com o GPS sabotado.
+  adminCounts() {
+    if (this.sabotage.gpsOff) return null;
+    const counts = {};
+    for (const p of this.players) {
+      if (!p.alive || p.inVent) continue;
+      const r = this.roomAtPos(p.x, p.y);
+      if (r) counts[r.id] = (counts[r.id] || 0) + 1;
+    }
+    for (const b of this.bodies) {
+      const r = this.roomAtPos(b.x, b.y);
+      if (r) counts[r.id] = (counts[r.id] || 0) + 1;
+    }
+    return counts;
   }
 
   // Possíveis interações para um jogador na posição atual (usado pela UI e pelos bots).
   interactionsFor(p) {
     const res = { use: null, report: null, kill: null, vent: null };
-    if (this.phase !== 'play') return res;
+    if (this.phase !== 'play' || p.inVent) return res;
     const near = (o, r = USE_RANGE) => Math.hypot(o.px - p.x, o.py - p.y) <= r;
     if (p.alive) {
       for (const f of this.map.fixPoints) {
@@ -397,6 +497,7 @@ export class Game {
       res.use = { kind: 'emergency', label: p.emergencyUses > 0 ? 'Convocar reunião de emergência' : 'Sem convocações restantes', disabled: !this.canCallEmergency(p) };
     }
     if (!res.use && near(this.map.cameraConsole)) res.use = { kind: 'cameras', label: 'Ver câmeras de segurança' };
+    if (!res.use && near(this.map.adminConsole)) res.use = { kind: 'admin', label: 'Abrir o painel de admin' };
     res.report = this.bodyNear(p);
     res.kill = this.killTargetFor(p);
     res.vent = this.ventNear(p);
@@ -405,7 +506,7 @@ export class Game {
 
   // ---------- vitória ----------
   checkWin() {
-    if (this.tutorial || this.phase === 'ended' || this.phase === 'meeting') return;
+    if (this.tutorial || this.phase === 'ended' || this.phase === 'meeting' || this.mode === 'mirror') return;
     const imp = this.players.filter((p) => p.alive && p.isImpostor).length;
     const crew = this.players.filter((p) => p.alive && !p.isImpostor).length;
     const { done, total } = this.taskProgress();
@@ -417,7 +518,7 @@ export class Game {
   end(winner, reason) {
     if (this.phase === 'ended') return;
     this.phase = 'ended';
-    const localWon = (winner === 'impostor') === this.local.isImpostor;
+    const localWon = this.local ? (winner === 'impostor') === this.local.isImpostor : null;
     this.result = { winner, reason, localWon, duration: this.time, meetings: this.meetingsHeld, progress: this.taskProgress() };
     this.addLog(reason, 'end');
     this.emit('end', this.result);

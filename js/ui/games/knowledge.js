@@ -21,6 +21,20 @@ const BANKS = {
     ['Em caso de choque elétrico em um colega, primeiro:', ['Desligar a fonte de energia', 'Puxar a pessoa com as mãos', 'Jogar água', 'Esperar passar']],
     ['O aterramento serve para:', ['Escoar correntes de fuga com segurança', 'Aumentar a tensão', 'Economizar energia', 'Deixar o fio mais bonito']],
   ],
+  log_prova: [
+    ['FIFO significa:', ['Primeiro a entrar, primeiro a sair', 'Último a entrar, primeiro a sair', 'Frete incluso', 'Fora do inventário']],
+    ['O que é um palete?', ['Estrado para movimentar e armazenar cargas', 'Tipo de caminhão', 'Nota fiscal', 'Etiqueta de preço']],
+    ['A nota fiscal acompanha a mercadoria para:', ['Comprovar a operação e o transporte', 'Enfeitar a caixa', 'Proteger do frio', 'Calcular o peso']],
+    ['Em uma empilhadeira, a carga deve ser transportada:', ['Baixa e inclinada para trás', 'O mais alto possível', 'Inclinada para frente', 'Sem travar os garfos']],
+    ['Código de barras serve para:', ['Identificar produtos rapidamente', 'Pintar a embalagem', 'Medir a temperatura', 'Ligar a esteira']],
+  ],
+  qc_inspecao: [
+    ['O paquímetro mede com precisão de até:', ['0,05 mm (ou menos)', '1 cm', '1 metro', '10 mm']],
+    ['Peça fora da tolerância deve ser:', ['Separada e identificada como não conforme', 'Enviada ao cliente', 'Escondida', 'Pintada de novo']],
+    ['Um micrômetro é usado para medir:', ['Dimensões muito pequenas', 'Pressão do pneu', 'Velocidade', 'Corrente elétrica']],
+    ['PDCA significa:', ['Planejar, Fazer, Checar, Agir', 'Pintar, Desenhar, Cortar, Apertar', 'Peça, Desenho, Cota, Ajuste', 'Produzir, Descartar, Comprar, Armazenar']],
+    ['Inspeção por amostragem verifica:', ['Parte do lote para avaliar o todo', 'Todas as peças, uma a uma', 'Só a embalagem', 'Só a cor']],
+  ],
   biblio_catalogo: [
     ['Um manual técnico de CLP deve estar na seção de:', ['Automação industrial', 'Literatura', 'Culinária', 'Geografia']],
     ['A sigla CNC significa:', ['Comando Numérico Computadorizado', 'Controle Normal de Corrente', 'Circuito Neutro Comum', 'Central de Normas Corporativas']],
@@ -72,16 +86,28 @@ const CASES = [
   ['A internet não funciona, mas outros PCs da sala navegam normalmente.', 'Cabo de rede'],
   ['A tela fica com listras coloridas e travamentos em programas 3D.', 'Placa de vídeo'],
 ];
-const PARTS = ['Memória RAM', 'Cooler / ventilação', 'Disco (SSD/HD)', 'Fonte de alimentação', 'Cabo de rede', 'Placa de vídeo'];
+const PC_PARTS = ['Memória RAM', 'Cooler / ventilação', 'Disco (SSD/HD)', 'Fonte de alimentação', 'Cabo de rede', 'Placa de vídeo'];
+
+const ENGINE_CASES = [
+  ['O motor gira mas não pega, e não há faísca nas velas.', 'Bobina de ignição'],
+  ['A luz da bateria acende com o motor ligado e a bateria descarrega.', 'Alternador'],
+  ['Fumaça branca no escapamento e o nível de água baixa sempre.', 'Junta do cabeçote'],
+  ['O motor esquenta rápido e a ventoinha não liga.', 'Sensor de temperatura'],
+  ['Barulho de chiado ao frear.', 'Pastilhas de freio'],
+  ['O carro falha em alta rotação e perde potência.', 'Filtro de combustível'],
+];
+const ENGINE_PARTS = ['Bobina de ignição', 'Alternador', 'Junta do cabeçote', 'Sensor de temperatura', 'Pastilhas de freio', 'Filtro de combustível'];
 
 export function diag(root, api) {
-  const cases = shuffle(CASES);
+  const engine = api.variant === 'mot_diag';
+  const cases = shuffle(engine ? ENGINE_CASES : CASES);
+  const PARTS = engine ? ENGINE_PARTS : PC_PARTS;
   let round = 0;
   const next = () => {
     if (round >= 3) { api.complete(); return; }
     const [symptom, answer] = cases[round];
     const options = shuffle([answer, ...shuffle(PARTS.filter((p) => p !== answer)).slice(0, 3)]);
-    root.innerHTML = `<div class="diag"><div class="terminal"><span>PC-LAB-${String(10 + round * 7).padStart(2, '0')} &gt; relatório do técnico</span><p>${symptom}</p></div><div class="opts"></div></div>`;
+    root.innerHTML = `<div class="diag"><div class="terminal"><span>${engine ? `MOTOR-${String(1 + round)}` : `PC-LAB-${String(10 + round * 7).padStart(2, '0')}`} &gt; relatório do técnico</span><p>${symptom}</p></div><div class="opts"></div></div>`;
     const box = root.querySelector('.opts');
     for (const o of options) {
       const b = document.createElement('button');
@@ -149,6 +175,14 @@ export function sequence(root, api) {
     const order = shuffle(ing).slice(0, 5);
     items = order.map(([ico, name], i) => ({ label: ico, sub: name, order: i }));
     prompt = `Pedido da mesa 4: ${order.map(([ico, n]) => `${ico} ${n}`).join(' → ')}`;
+  } else if (api.variant === 'exp_pedido') {
+    const steps = [['📦', 'Montar a caixa'], ['🫧', 'Plástico-bolha'], ['🎁', 'Produto'], ['🧾', 'Nota fiscal'], ['🩹', 'Fechar com fita'], ['🏷️', 'Etiqueta']];
+    items = steps.map(([ico, name], i) => ({ label: ico, sub: name, order: i }));
+    prompt = `Embale na ordem: ${steps.map(([, n]) => n).join(' → ')}`;
+  } else if (api.variant === 'pint_cores') {
+    const order = shuffle([['🔵', 'Azul'], ['🟡', 'Amarelo'], ['⚪', 'Branco'], ['🔴', 'Vermelho'], ['⚫', 'Preto']]);
+    items = order.map(([ico, name], i) => ({ label: ico, sub: name, order: i }));
+    prompt = `Receita da tinta: ${order.map(([, n]) => n).join(' → ')}`;
   } else if (api.variant === 'biblio_livros') {
     const codes = shuffle([621.3, 4.6, 670.4, 629.8, 530.1, 658.5, 510.2]).slice(0, 6).sort((a, b) => a - b);
     items = codes.map((c, i) => ({ label: '📘', sub: c.toFixed(1).padStart(5, '0'), order: i }));

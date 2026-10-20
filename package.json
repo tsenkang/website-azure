@@ -1,12 +1,19 @@
 {
   "name": "senai-suspeitos",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Jogo de dedução social ambientado em uma escola técnica (Canvas 2D + JavaScript, sem dependências).",
+  "description": "Jogo de dedução social ambientado em uma escola técnica: single-player com bots ou online com amigos.",
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "start": "npx --yes serve -l 8080 .",
+    "start": "node server/server.js",
     "test": "node tests/simulate.mjs 12",
-    "test:browser": "node tests/smoke.mjs http://localhost:8080/index.html && node tests/minigames.mjs http://localhost:8080/index.html"
+    "test:browser": "node tests/smoke.mjs http://localhost:8080/index.html && node tests/minigames.mjs http://localhost:8080/index.html",
+    "test:online": "node tests/online.mjs http://localhost:8080"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
   }
 }

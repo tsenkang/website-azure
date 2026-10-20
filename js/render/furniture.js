@@ -1,6 +1,6 @@
 // Desenho estático dos móveis/equipamentos e das partes animadas.
 import { TILE as T } from '../config.js';
-import { roundRect } from './sprites.js';
+import { roundRect, INK } from './sprites.js';
 
 const C = {
   metal: '#9aa5b5', metalDark: '#566174', metalDeep: '#3a4252', blue: '#2c5d9e', blueLight: '#4b86d6',
@@ -9,26 +9,34 @@ const C = {
 };
 
 function shadow(ctx, x, y, w, h) {
-  ctx.fillStyle = 'rgba(0,0,0,0.22)';
-  roundRect(ctx, x + 3, y + 5, w, h, 4); ctx.fill();
+  ctx.fillStyle = 'rgba(8,10,20,0.32)';
+  roundRect(ctx, x + 4, y + 7, w, h, 5); ctx.fill();
 }
 
-// Caixa em perspectiva 3/4: tampo + face frontal.
+// Contorno escuro grosso (estilo cartoon) no caminho atual.
+function ink(ctx, lw = 2.2) { ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.lineJoin = 'round'; ctx.stroke(); }
+
+// Caixa em perspectiva 3/4: tampo + face frontal, com contorno e brilho na quina.
 function box(ctx, x, y, w, h, top, front, fh = 7, r = 3) {
   ctx.fillStyle = front;
   roundRect(ctx, x, y + fh * 0.4, w, h - fh * 0.4, r); ctx.fill();
   ctx.fillStyle = top;
   roundRect(ctx, x, y, w, h - fh, r); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.fillRect(x + r, y + 1.5, w - r * 2, 2);
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(x + 1, y + h - fh); ctx.lineTo(x + w - 1, y + h - fh); ctx.stroke();
+  roundRect(ctx, x, y, w, h, r); ink(ctx);
 }
 
 function chair(ctx, x, y, color = '#2f3a4f') {
-  ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x + 1, y + 4, 7, 4, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = color; roundRect(ctx, x - 6, y - 5, 12, 10, 3); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.12)'; roundRect(ctx, x - 6, y - 5, 12, 3, 2); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(x + 1, y + 5, 7, 4, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = color; roundRect(ctx, x - 6, y - 5, 12, 10, 3); ctx.fill(); ink(ctx, 1.6);
+  ctx.fillStyle = 'rgba(255,255,255,0.18)'; roundRect(ctx, x - 5, y - 4, 10, 3, 2); ctx.fill();
 }
 
 function monitor(ctx, x, y, w = 16, glow = '#3d8bd9') {
-  ctx.fillStyle = C.black; roundRect(ctx, x, y, w, 10, 1.5); ctx.fill();
+  ctx.fillStyle = C.black; roundRect(ctx, x, y, w, 10, 1.5); ctx.fill(); ink(ctx, 1.4);
   ctx.fillStyle = glow; ctx.fillRect(x + 1.5, y + 1.5, w - 3, 7);
   ctx.fillStyle = '#444'; ctx.fillRect(x + w / 2 - 1.5, y + 10, 3, 3);
 }
@@ -88,7 +96,7 @@ export function drawFurniture(ctx, f) {
     }
     case 'compressor': {
       shadow(ctx, x, y, w, h);
-      ctx.fillStyle = C.red; roundRect(ctx, x + 4, y + 10, w - 8, h - 18, 14); ctx.fill();
+      ctx.fillStyle = C.red; roundRect(ctx, x + 4, y + 10, w - 8, h - 18, 14); ctx.fill(); ink(ctx);
       ctx.fillStyle = 'rgba(255,255,255,0.25)'; roundRect(ctx, x + 8, y + 13, w - 16, 6, 3); ctx.fill();
       ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, y + 30, 6, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = '#222'; ctx.lineWidth = 1; ctx.stroke();
@@ -145,13 +153,13 @@ export function drawFurniture(ctx, f) {
     case 'robot': {
       ctx.fillStyle = 'rgba(242,194,48,0.18)'; ctx.beginPath(); ctx.arc(cx, cy, w / 2 + 4, 0, Math.PI * 2); ctx.fill();
       ctx.setLineDash([6, 6]); ctx.strokeStyle = C.yellow; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, w / 2 + 4, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle = C.metalDeep; ctx.beginPath(); ctx.arc(cx, cy, 16, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = C.metalDeep; ctx.beginPath(); ctx.arc(cx, cy, 16, 0, Math.PI * 2); ctx.fill(); ink(ctx);
       ctx.fillStyle = '#ef8a1f'; ctx.beginPath(); ctx.arc(cx, cy, 12, 0, Math.PI * 2); ctx.fill();
       break;
     }
     case 'conveyor': {
       shadow(ctx, x, y, w, h);
-      ctx.fillStyle = C.metalDark; roundRect(ctx, x, y + 2, w, h - 4, 4); ctx.fill();
+      ctx.fillStyle = C.metalDark; roundRect(ctx, x, y + 2, w, h - 4, 4); ctx.fill(); ink(ctx);
       ctx.fillStyle = '#2a2f38'; ctx.fillRect(x + 4, y + 6, w - 8, h - 12);
       break;
     }
@@ -256,7 +264,7 @@ export function drawFurniture(ctx, f) {
       break;
     }
     case 'projector': {
-      ctx.fillStyle = '#ddd'; roundRect(ctx, x + 6, y + 8, 20, 14, 3); ctx.fill();
+      ctx.fillStyle = '#ddd'; roundRect(ctx, x + 6, y + 8, 20, 14, 3); ctx.fill(); ink(ctx, 1.6);
       ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(x + 22, y + 15, 4, 0, Math.PI * 2); ctx.fill();
       break;
     }
@@ -270,17 +278,17 @@ export function drawFurniture(ctx, f) {
     }
     case 'emergencytable': {
       ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(cx + 3, cy + 6, w / 2, h / 2 - 4, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#5c4632'; ctx.beginPath(); ctx.ellipse(cx, cy + 4, w / 2 - 2, h / 2 - 6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#5c4632'; ctx.beginPath(); ctx.ellipse(cx, cy + 4, w / 2 - 2, h / 2 - 6, 0, 0, Math.PI * 2); ctx.fill(); ink(ctx);
       ctx.fillStyle = '#8a6a4a'; ctx.beginPath(); ctx.ellipse(cx, cy, w / 2 - 2, h / 2 - 8, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#c8ccd2'; ctx.beginPath(); ctx.ellipse(cx, cy, 16, 12, 0, 0, Math.PI * 2); ctx.fill();
       break;
     }
     case 'roundtable': {
       for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-        ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.arc(cx + dx * 24, cy + dy * 22, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.arc(cx + dx * 24, cy + dy * 22, 6, 0, Math.PI * 2); ctx.fill(); ink(ctx, 1.6);
       }
       ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.arc(cx + 3, cy + 5, 19, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#e8e2d4'; ctx.beginPath(); ctx.arc(cx, cy, 18, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e8e2d4'; ctx.beginPath(); ctx.arc(cx, cy, 18, 0, Math.PI * 2); ctx.fill(); ink(ctx);
       ctx.fillStyle = '#f2c230'; ctx.beginPath(); ctx.arc(cx - 5, cy - 3, 4, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#d9483b'; ctx.fillRect(cx + 2, cy, 6, 8);
       break;
@@ -311,7 +319,7 @@ export function drawFurniture(ctx, f) {
     }
     case 'planter': {
       ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.arc(cx + 2, cy + 5, 12, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#8a5a36'; ctx.beginPath(); ctx.arc(cx, cy + 3, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#8a5a36'; ctx.beginPath(); ctx.arc(cx, cy + 3, 11, 0, Math.PI * 2); ctx.fill(); ink(ctx);
       ['#2f8f4e', '#3fae5e', '#5cc77a'].forEach((c, i) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(cx - 4 + i * 4, cy - 3 - (i % 2) * 4, 9 - i * 2, 0, Math.PI * 2); ctx.fill(); });
       break;
     }
@@ -338,7 +346,7 @@ export function drawFurniture(ctx, f) {
     }
     case 'boiler': {
       shadow(ctx, x, y, w, h);
-      ctx.fillStyle = '#7e8a99'; roundRect(ctx, x + 6, y + 6, w - 12, h - 12, 26); ctx.fill();
+      ctx.fillStyle = '#7e8a99'; roundRect(ctx, x + 6, y + 6, w - 12, h - 12, 26); ctx.fill(); ink(ctx);
       ctx.fillStyle = 'rgba(255,255,255,0.18)'; roundRect(ctx, x + 12, y + 10, w - 24, 10, 5); ctx.fill();
       ctx.strokeStyle = '#b5652f'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(x + 6, y + h - 20); ctx.lineTo(x - 10, y + h - 20); ctx.stroke();
       ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, cy, 11, 0, Math.PI * 2); ctx.fill();
@@ -348,7 +356,7 @@ export function drawFurniture(ctx, f) {
     case 'barrels': {
       for (const [dx, dy] of [[16, 16], [46, 22], [24, 46]]) {
         ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.arc(x + dx + 2, y + dy + 4, 12, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#2c6fd6'; ctx.beginPath(); ctx.arc(x + dx, y + dy, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#2c6fd6'; ctx.beginPath(); ctx.arc(x + dx, y + dy, 12, 0, Math.PI * 2); ctx.fill(); ink(ctx);
         ctx.strokeStyle = '#1b4a96'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x + dx, y + dy, 8, 0, Math.PI * 2); ctx.stroke();
       }
       break;
@@ -429,6 +437,106 @@ export function drawFurniture(ctx, f) {
       ctx.fillStyle = '#fff'; ctx.fillRect(x + 50, y + 14, 18, 12); ctx.fillStyle = '#c0392b'; ctx.fillRect(x + 80, y + 16, 16, 10);
       break;
     }
+    case 'bed': {
+      shadow(ctx, x, y, w, h);
+      box(ctx, x + 3, y + 2, w - 6, h - 4, '#e9eef4', '#9aa6b5', 8, 5);
+      ctx.fillStyle = '#ffffff'; roundRect(ctx, x + 8, y + 6, w - 16, 14, 5); ctx.fill(); ink(ctx, 1.6);
+      ctx.fillStyle = '#7ec8e3'; roundRect(ctx, x + 5, y + 26, w - 10, h - 38, 4); ctx.fill(); ink(ctx, 1.6);
+      break;
+    }
+    case 'scanner': {
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(cx + 2, cy + 5, w / 2 - 6, h / 2 - 8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#7e8a99'; ctx.beginPath(); ctx.ellipse(cx, cy + 2, w / 2 - 6, h / 2 - 9, 0, 0, Math.PI * 2); ctx.fill(); ink(ctx);
+      ctx.fillStyle = '#b8c3cf'; ctx.beginPath(); ctx.ellipse(cx, cy, w / 2 - 12, h / 2 - 15, 0, 0, Math.PI * 2); ctx.fill(); ink(ctx, 1.6);
+      ctx.strokeStyle = '#3fdc9a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(cx, cy, w / 2 - 20, h / 2 - 22, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#2b3445'; roundRect(ctx, cx - 8, y + h - 14, 16, 8, 2); ctx.fill(); ink(ctx, 1.4);
+      break;
+    }
+    case 'medcabinet': {
+      shadow(ctx, x, y, w, h);
+      box(ctx, x + 2, y + 1, w - 4, h - 1, '#f4f7fb', '#b4bfcc', 8);
+      ctx.fillStyle = '#e04b4b'; ctx.fillRect(cx - 2, y + 4, 4, 11); ctx.fillRect(cx - 5.5, y + 7.5, 11, 4);
+      break;
+    }
+    case 'admindesk': {
+      shadow(ctx, x, y, w, h);
+      box(ctx, x + 2, y + 3, w - 4, h - 4, '#3b4456', '#262c38', 12);
+      ctx.fillStyle = '#0f2a44'; roundRect(ctx, x + 8, y + 7, w - 16, h - 26, 4); ctx.fill(); ink(ctx, 1.6);
+      ctx.strokeStyle = 'rgba(120,200,255,0.55)'; ctx.lineWidth = 1;
+      for (let i = 0; i < 4; i++) ctx.strokeRect(x + 12 + i * ((w - 28) / 4), y + 11, (w - 36) / 4, h - 34);
+      label(ctx, 'ADMIN', cx, y + h - 9, '#9fd4ff', 8);
+      break;
+    }
+    case 'dockdoor': {
+      box(ctx, x + 2, y, w - 4, h, '#c9ced6', '#8792a3', 6, 2);
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
+      for (let i = 4; i < h - 6; i += 4) { ctx.beginPath(); ctx.moveTo(x + 4, y + i); ctx.lineTo(x + w - 4, y + i); ctx.stroke(); }
+      hazardStripes(ctx, x + 2, y + h - 6, w - 4, 4, 4);
+      break;
+    }
+    case 'forklift': {
+      shadow(ctx, x, y, w, h);
+      ctx.fillStyle = '#2b2f36'; for (const [wx, wy] of [[x + 8, y + h - 8], [x + w - 8, y + h - 8], [x + 8, y + 12], [x + w - 8, y + 12]]) { ctx.beginPath(); ctx.arc(wx, wy, 6, 0, Math.PI * 2); ctx.fill(); ink(ctx, 1.6); }
+      box(ctx, x + 6, y + 6, w - 12, h - 14, '#f2b230', '#c48614', 10, 6);
+      ctx.fillStyle = '#2b3445'; roundRect(ctx, x + 14, y + 12, w - 28, 16, 3); ctx.fill(); ink(ctx, 1.6);
+      ctx.fillStyle = '#8792a3'; ctx.fillRect(x + 10, y - 4, 4, 14); ctx.fillRect(x + w - 14, y - 4, 4, 14);
+      break;
+    }
+    case 'palletrack': {
+      shadow(ctx, x, y, w, h);
+      box(ctx, x + 1, y, w - 2, h, '#e0702b', '#9c4a16', 10, 2);
+      for (let i = 0; i < f.w; i++) {
+        const bx = x + 4 + i * T;
+        ctx.fillStyle = (i + f.y) % 3 ? '#c69a63' : '#d7b27a'; roundRect(ctx, bx, y + 2, T - 8, 14, 2); ctx.fill(); ink(ctx, 1.2);
+      }
+      break;
+    }
+    case 'scale': {
+      shadow(ctx, x, y, w, h);
+      box(ctx, x + 4, y + 6, w - 8, h - 10, '#9aa5b5', '#566174', 8);
+      ctx.fillStyle = '#123049'; roundRect(ctx, x + 10, y + 10, 24, 10, 2); ctx.fill();
+      label(ctx, '25.0 kg', x + 22, y + 15, '#6dffa8', 7);
+      break;
+    }
+    case 'carbody': {
+      shadow(ctx, x, y, w, h);
+      ctx.fillStyle = '#20232b'; for (const wx of [x + 26, x + w - 26]) { roundRect(ctx, wx - 9, y + 2, 18, 8, 3); ctx.fill(); roundRect(ctx, wx - 9, y + h - 10, 18, 8, 3); ctx.fill(); }
+      ctx.fillStyle = f.x % 2 ? '#d93b3b' : '#2f6fde';
+      roundRect(ctx, x + 6, y + 8, w - 12, h - 16, 18); ctx.fill(); ink(ctx);
+      ctx.fillStyle = 'rgba(170,220,255,0.8)'; roundRect(ctx, x + w * 0.32, y + 14, w * 0.36, h - 28, 8); ctx.fill(); ink(ctx, 1.6);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; roundRect(ctx, x + 14, y + 12, w * 0.16, 5, 2); ctx.fill();
+      break;
+    }
+    case 'engine': {
+      shadow(ctx, x, y, w, h);
+      box(ctx, x + 4, y + 4, w - 8, h - 8, '#7e8a99', '#4b5563', 12, 6);
+      ctx.fillStyle = '#c0392b'; roundRect(ctx, x + 12, y + 10, w - 24, 18, 4); ctx.fill(); ink(ctx, 1.6);
+      ctx.fillStyle = '#2b2f36'; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(x + 20 + i * 15, y + 19, 4, 0, Math.PI * 2); ctx.fill(); }
+      break;
+    }
+    case 'paintbooth': {
+      shadow(ctx, x, y, w, h);
+      ctx.fillStyle = 'rgba(255,200,230,0.25)'; roundRect(ctx, x + 4, y + 4, w - 8, h - 8, 8); ctx.fill();
+      ctx.strokeStyle = '#8fa3b8'; ctx.lineWidth = 6; roundRect(ctx, x + 4, y + 4, w - 8, h - 8, 8); ctx.stroke();
+      roundRect(ctx, x + 1, y + 1, w - 2, h - 2, 10); ink(ctx);
+      ctx.fillStyle = '#f2c230'; roundRect(ctx, cx - 40, cy - 16, 80, 32, 12); ctx.fill(); ink(ctx, 1.6);
+      ctx.fillStyle = 'rgba(255,120,190,0.5)'; ctx.beginPath(); ctx.arc(cx + 24, cy - 18, 14, 0, Math.PI * 2); ctx.fill();
+      label(ctx, 'CABINE DE PINTURA', cx, y + 16, '#ffe0f0', 8);
+      break;
+    }
+    case 'bench': {
+      shadow(ctx, x, y, w, h);
+      box(ctx, x + 2, y + 8, w - 4, h - 12, C.wood, C.woodDark, 5, 3);
+      break;
+    }
+    case 'cones': {
+      for (let i = 0; i < f.w * 2; i++) {
+        const px = x + 10 + i * 16, py = y + 20;
+        ctx.fillStyle = '#ef7d1a'; ctx.beginPath(); ctx.moveTo(px, py - 14); ctx.lineTo(px + 7, py + 4); ctx.lineTo(px - 7, py + 4); ctx.closePath(); ctx.fill(); ink(ctx, 1.6);
+        ctx.fillStyle = '#fff'; ctx.fillRect(px - 3.5, py - 5, 7, 3);
+      }
+      break;
+    }
     default: {
       shadow(ctx, x, y, w, h);
       box(ctx, x + 2, y + 2, w - 4, h - 4, C.metal, C.metalDark);
@@ -450,6 +558,7 @@ export function drawAnimated(ctx, f, t, opts) {
       const ex = cx + Math.cos(a1) * l1, ey = cy + Math.sin(a1) * l1 * 0.8;
       const hx = ex + Math.cos(a1 + a2) * l2, hy = ey + Math.sin(a1 + a2) * l2 * 0.8;
       ctx.lineCap = 'round';
+      ctx.strokeStyle = INK; ctx.lineWidth = 13; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.lineTo(hx, hy); ctx.stroke();
       ctx.strokeStyle = '#ef8a1f'; ctx.lineWidth = 9; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke();
       ctx.strokeStyle = '#f5a54a'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(hx, hy); ctx.stroke();
       ctx.fillStyle = '#3a4252'; ctx.beginPath(); ctx.arc(ex, ey, 5, 0, Math.PI * 2); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.fill();
