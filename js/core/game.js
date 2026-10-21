@@ -429,7 +429,7 @@ export class Game {
     this.bodies = [];
     this.placeAroundTable();
     this.emergencyCooldown = 15;
-    for (const p of this.players) p.killCooldown = Math.max(p.killCooldown, this.diff.killCooldown * 0.8);
+    for (const p of this.players) p.killCooldown = Math.max(p.killCooldown, this.diff.killCooldown);
     this.sabotage.cooldown = Math.max(this.sabotage.cooldown, 12);
     this.phase = 'play';
     this.emit('meetingEnd', {});

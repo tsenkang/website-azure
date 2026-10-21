@@ -53,17 +53,17 @@ export const BOT_NAMES = [
 // Parâmetros de dificuldade (afetam principalmente os bots).
 export const DIFFICULTY = {
   facil: {
-    label: 'Fácil', botSpeed: 0.85, botVision: 0.8, observe: 0.55, killCooldown: 35,
+    label: 'Fácil', botSpeed: 0.85, botVision: 0.8, observe: 0.55, killCooldown: 45,
     critTime: 60, killCare: 0.35, voteThreshold: 55, sabotageRate: 0.012, ventUse: 0.25,
     reactTime: 2.2, selfReport: 0, lieSkill: 0.35, randomVote: 0.25,
   },
   normal: {
-    label: 'Normal', botSpeed: 0.95, botVision: 0.9, observe: 0.8, killCooldown: 28,
+    label: 'Normal', botSpeed: 0.95, botVision: 0.9, observe: 0.8, killCooldown: 45,
     critTime: 48, killCare: 0.75, voteThreshold: 42, sabotageRate: 0.02, ventUse: 0.6,
     reactTime: 1.2, selfReport: 0.1, lieSkill: 0.65, randomVote: 0.1,
   },
   dificil: {
-    label: 'Difícil', botSpeed: 1.0, botVision: 1.0, observe: 1.0, killCooldown: 22,
+    label: 'Difícil', botSpeed: 1.0, botVision: 1.0, observe: 1.0, killCooldown: 45,
     critTime: 40, killCare: 1.0, voteThreshold: 34, sabotageRate: 0.03, ventUse: 0.9,
     reactTime: 0.6, selfReport: 0.2, lieSkill: 0.9, randomVote: 0.03,
   },
